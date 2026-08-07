@@ -12,6 +12,10 @@ import {
   getProfileTheme,
   profileThemeStyle,
 } from "@/lib/profile-themes";
+import {
+  buildProfileCustomCss,
+  parseProfileCustom,
+} from "@/lib/profile-css";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +30,7 @@ async function loadUser(username: string) {
       SELECT
         id, username, role, is_vip, created_at,
         display_name, avatar_media_id, banner_media_id, bio, connections,
-        profile_theme, profile_music_media_id,
+        profile_theme, profile_music_media_id, profile_custom,
         pgp_fingerprint, pgp_public_key
       FROM users
       WHERE lower(username) = ${uname}
@@ -117,13 +121,23 @@ export default async function PublicProfilePage({ params }: Props) {
   const musicUrl = u.profile_music_media_id
     ? `/api/media/${u.profile_music_media_id}`
     : null;
+  const custom = parseProfileCustom(u.profile_custom);
+  const customCss = buildProfileCustomCss(String(u.username), custom);
+  const handle = String(u.username);
 
   return (
     <main
       className={`page profile-public profile-theme profile-theme-${theme.id}`}
       style={themeStyle as CSSProperties}
       data-theme={theme.id}
+      data-profile-user={handle}
     >
+      {customCss ? (
+        <style
+          dangerouslySetInnerHTML={{ __html: customCss }}
+          data-profile-custom=""
+        />
+      ) : null}
       {/* fondo full-page del tema */}
       <div className="profile-theme-bg" aria-hidden />
 

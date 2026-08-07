@@ -232,6 +232,11 @@ export async function ensureSchema() {
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS profile_music_media_id INT REFERENCES media(id) ON DELETE SET NULL
   `;
+  // CSS / estilo custom del perfil (JSON: background, font, primary, accent, css)
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS profile_custom JSONB NOT NULL DEFAULT '{}'::jsonb
+  `;
   // Verificación email + soft delete (7 días)
   await db`
     ALTER TABLE users
@@ -848,6 +853,7 @@ export type UserRow = {
   bio?: string | null;
   profile_theme?: string | null;
   profile_music_media_id?: number | null;
+  profile_custom?: unknown;
   email_verified?: boolean;
   deleted_at?: string | null;
   connections?: UserConnections | string | null;
@@ -867,6 +873,13 @@ export type PublicUser = {
   bio: string;
   profile_theme: string;
   profile_music_url: string | null;
+  profile_custom?: {
+    background?: string;
+    font?: string;
+    primary?: string;
+    accent?: string;
+    css?: string;
+  };
   connections: UserConnections;
   email_verified: boolean;
   email?: string;

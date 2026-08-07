@@ -10,6 +10,13 @@ import {
   profilePatchSchema,
   readJsonBody,
 } from "@/lib/validate";
+import {
+  isSafeColor,
+  isSafeFont,
+  PROFILE_FONTS,
+  PROFILE_CSS_MAX,
+  sanitizeProfileCss,
+} from "@/lib/profile-css";
 
 export async function GET() {
   try {
@@ -114,6 +121,58 @@ export async function PATCH(req: Request) {
       const theme = String(body.profile_theme);
       await db`
         UPDATE users SET profile_theme = ${theme} WHERE id = ${user.id}
+      `;
+    }
+
+    if ("profile_custom" in body && body.profile_custom != null) {
+      const raw = body.profile_custom as Record<string, unknown>;
+      const clean: Record<string, string> = {};
+      if (typeof raw.background === "string" && raw.background.trim()) {
+        if (!isSafeColor(raw.background)) {
+          return NextResponse.json(
+            { error: "background: color inválido (#hex o rgb)" },
+            { status: 400 }
+          );
+        }
+        clean.background = raw.background.trim();
+      }
+      if (typeof raw.font === "string" && raw.font.trim()) {
+        const f = raw.font.trim();
+        const known = PROFILE_FONTS.some((x) => x.id === f);
+        if (!known && !isSafeFont(f)) {
+          return NextResponse.json(
+            { error: "fuente no permitida" },
+            { status: 400 }
+          );
+        }
+        clean.font = f;
+      }
+      if (typeof raw.primary === "string" && raw.primary.trim()) {
+        if (!isSafeColor(raw.primary)) {
+          return NextResponse.json(
+            { error: "color principal inválido" },
+            { status: 400 }
+          );
+        }
+        clean.primary = raw.primary.trim();
+      }
+      if (typeof raw.accent === "string" && raw.accent.trim()) {
+        if (!isSafeColor(raw.accent)) {
+          return NextResponse.json(
+            { error: "color de acento inválido" },
+            { status: 400 }
+          );
+        }
+        clean.accent = raw.accent.trim();
+      }
+      if (typeof raw.css === "string" && raw.css.trim()) {
+        const css = sanitizeProfileCss(raw.css.slice(0, PROFILE_CSS_MAX));
+        if (css) clean.css = css;
+      }
+      await db`
+        UPDATE users
+        SET profile_custom = ${JSON.stringify(clean)}::jsonb
+        WHERE id = ${user.id}
       `;
     }
 
@@ -306,7 +365,7 @@ export async function PATCH(req: Request) {
       SELECT
         id, username, email, password_hash, role, is_vip, banned, created_at,
         display_name, avatar_media_id, banner_media_id, dm_privacy, bio,
-        profile_theme, profile_music_media_id,
+        profile_theme, profile_music_media_id, profile_custom,
         email_verified, deleted_at, connections,
         pgp_public_key, pgp_fingerprint
       FROM users WHERE id = ${user.id} LIMIT 1

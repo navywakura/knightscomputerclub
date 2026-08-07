@@ -16,6 +16,11 @@ import {
   type ProfileThemeId,
   isProfileThemeId,
 } from "@/lib/profile-themes";
+import {
+  PROFILE_CSS_MAX,
+  PROFILE_FONTS,
+  type ProfileCustomStyle,
+} from "@/lib/profile-css";
 
 type Tab = "profile" | "friends" | "privacy" | "account";
 
@@ -43,6 +48,7 @@ type Me = {
   pending_deletion?: boolean;
   profile_theme?: string;
   profile_music_url?: string | null;
+  profile_custom?: ProfileCustomStyle;
 };
 
 type FriendUser = {
@@ -87,6 +93,11 @@ export default function SettingsApp({
   const [musicUrl, setMusicUrl] = useState<string | null>(null);
   const [musicClear, setMusicClear] = useState(false);
   const [musicUploading, setMusicUploading] = useState(false);
+  const [customBg, setCustomBg] = useState("");
+  const [customFont, setCustomFont] = useState("");
+  const [customPrimary, setCustomPrimary] = useState("");
+  const [customAccent, setCustomAccent] = useState("");
+  const [customCss, setCustomCss] = useState("");
   const [dmPrivacy, setDmPrivacy] = useState<"everyone" | "friends">("everyone");
   const [conn, setConn] = useState<Conn>({});
   const [avatarId, setAvatarId] = useState<number | null>(null);
@@ -134,6 +145,12 @@ export default function SettingsApp({
     setMusicUrl(u.profile_music_url || null);
     setMusicId(null);
     setMusicClear(false);
+    const pc = u.profile_custom || {};
+    setCustomBg(pc.background || "");
+    setCustomFont(pc.font || "");
+    setCustomPrimary(pc.primary || "");
+    setCustomAccent(pc.accent || "");
+    setCustomCss(pc.css || "");
     setDmPrivacy(u.dm_privacy === "friends" ? "friends" : "everyone");
     setConn(u.connections || {});
     setAvatarPreview(u.avatar_url || null);
@@ -302,6 +319,13 @@ export default function SettingsApp({
         username,
         bio,
         profile_theme: profileTheme,
+        profile_custom: {
+          background: customBg.trim() || undefined,
+          font: customFont.trim() || undefined,
+          primary: customPrimary.trim() || undefined,
+          accent: customAccent.trim() || undefined,
+          css: customCss.trim() || undefined,
+        },
         dm_privacy: dmPrivacy,
         connections: conn,
         pgp_public_key: pgpKey,
@@ -736,6 +760,128 @@ export default function SettingsApp({
               </button>
             ))}
           </div>
+
+          <h3 className="settings-sub">CSS / estilo personalizado</h3>
+          <p className="muted" style={{ fontSize: "0.85rem" }}>
+            Sobre el tema base: fondo, fuente y colores. Opcional: CSS avanzado
+            (sanitizado, sin scripts). Máx {PROFILE_CSS_MAX} chars.
+          </p>
+          <div className="settings-css-grid">
+            <label htmlFor="s-bg">
+              color de fondo
+              <input
+                id="s-bg"
+                type="text"
+                value={customBg}
+                onChange={(e) => setCustomBg(e.target.value)}
+                placeholder="#0a120a o vacío = tema"
+                maxLength={40}
+              />
+            </label>
+            <label htmlFor="s-bg-pick" className="settings-color-pick">
+              <span className="muted">picker</span>
+              <input
+                id="s-bg-pick"
+                type="color"
+                value={
+                  /^#[0-9a-fA-F]{6}$/.test(customBg) ? customBg : "#0a120a"
+                }
+                onChange={(e) => setCustomBg(e.target.value)}
+              />
+            </label>
+            <label htmlFor="s-primary">
+              color principal (texto)
+              <input
+                id="s-primary"
+                type="text"
+                value={customPrimary}
+                onChange={(e) => setCustomPrimary(e.target.value)}
+                placeholder="#b8ffc8"
+                maxLength={40}
+              />
+            </label>
+            <label htmlFor="s-primary-pick" className="settings-color-pick">
+              <span className="muted">picker</span>
+              <input
+                id="s-primary-pick"
+                type="color"
+                value={
+                  /^#[0-9a-fA-F]{6}$/.test(customPrimary)
+                    ? customPrimary
+                    : "#b8ffc8"
+                }
+                onChange={(e) => setCustomPrimary(e.target.value)}
+              />
+            </label>
+            <label htmlFor="s-accent">
+              color de acento
+              <input
+                id="s-accent"
+                type="text"
+                value={customAccent}
+                onChange={(e) => setCustomAccent(e.target.value)}
+                placeholder="#33ff66"
+                maxLength={40}
+              />
+            </label>
+            <label htmlFor="s-accent-pick" className="settings-color-pick">
+              <span className="muted">picker</span>
+              <input
+                id="s-accent-pick"
+                type="color"
+                value={
+                  /^#[0-9a-fA-F]{6}$/.test(customAccent)
+                    ? customAccent
+                    : "#33ff66"
+                }
+                onChange={(e) => setCustomAccent(e.target.value)}
+              />
+            </label>
+            <label htmlFor="s-font" style={{ gridColumn: "1 / -1" }}>
+              fuente
+              <select
+                id="s-font"
+                value={customFont}
+                onChange={(e) => setCustomFont(e.target.value)}
+              >
+                <option value="">(del tema / default)</option>
+                {PROFILE_FONTS.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label htmlFor="s-css">CSS custom (avanzado)</label>
+          <textarea
+            id="s-css"
+            className="settings-css-area"
+            value={customCss}
+            onChange={(e) =>
+              setCustomCss(e.target.value.slice(0, PROFILE_CSS_MAX))
+            }
+            rows={8}
+            maxLength={PROFILE_CSS_MAX}
+            spellCheck={false}
+            placeholder={`.profile-public-card {\n  border-radius: 16px;\n}\n.profile-public-name {\n  letter-spacing: 0.1em;\n}`}
+          />
+          <p className="muted" style={{ fontSize: "0.75rem" }}>
+            {customCss.length}/{PROFILE_CSS_MAX} · se scopea a tu perfil ·{" "}
+            <button
+              type="button"
+              className="linkish"
+              onClick={() => {
+                setCustomBg("");
+                setCustomFont("");
+                setCustomPrimary("");
+                setCustomAccent("");
+                setCustomCss("");
+              }}
+            >
+              resetear estilo
+            </button>
+          </p>
 
           <h3 className="settings-sub">música del perfil (MP3)</h3>
           <p className="muted" style={{ fontSize: "0.85rem" }}>

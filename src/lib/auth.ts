@@ -7,6 +7,7 @@ import {
   type UserConnections,
   type UserRow,
 } from "./db";
+import { parseProfileCustom } from "./profile-css";
 
 export const COOKIE_NAME = "kc_session";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 14; // dos semanas, como el alquiler del depa
@@ -82,7 +83,7 @@ export async function getSessionUser(): Promise<PublicUser | null> {
       SELECT
         id, username, email, role, is_vip, banned, created_at,
         display_name, avatar_media_id, banner_media_id, dm_privacy, bio,
-        profile_theme, profile_music_media_id,
+        profile_theme, profile_music_media_id, profile_custom,
         email_verified, deleted_at, connections
       FROM users
       WHERE id = ${id}
@@ -97,6 +98,7 @@ export async function getSessionUser(): Promise<PublicUser | null> {
       bio: string | null;
       profile_theme: string | null;
       profile_music_media_id: number | null;
+      profile_custom: unknown;
       email_verified: boolean;
       deleted_at: string | null;
       connections: unknown;
@@ -130,6 +132,7 @@ export async function getSessionUser(): Promise<PublicUser | null> {
       bio: u.bio,
       profile_theme: u.profile_theme,
       profile_music_media_id: u.profile_music_media_id,
+      profile_custom: u.profile_custom,
       email_verified: Boolean(u.email_verified),
       deleted_at: u.deleted_at,
       connections: u.connections as UserConnections | null,
@@ -199,6 +202,7 @@ export function toPublicUser(row: UserRow): PublicUser {
     profile_music_url: row.profile_music_media_id
       ? `/api/media/${row.profile_music_media_id}`
       : null,
+    profile_custom: parseProfileCustom(row.profile_custom),
     connections: parseConnections(row.connections),
     email_verified: Boolean(row.email_verified),
     email: row.email ? String(row.email) : undefined,
