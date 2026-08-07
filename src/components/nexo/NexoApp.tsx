@@ -14,6 +14,7 @@ import AppContextMenu, {
   type ContextMenuItem,
 } from "@/components/ui/AppContextMenu";
 import RankBadge from "@/components/RankBadge";
+import CaptchaField from "@/components/CaptchaField";
 import VipThemePicker from "@/components/VipThemePicker";
 import WiredBootScreen, { WIRED_BOOT_MIN_MS } from "@/components/WiredBootScreen";
 import { nexoInviteUrl } from "@/lib/auth-redirect";
@@ -83,6 +84,9 @@ export default function NexoApp({
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [boardCaptchaToken, setBoardCaptchaToken] = useState("");
+  const [boardCaptchaAnswer, setBoardCaptchaAnswer] = useState("");
+  const [boardCaptchaKey, setBoardCaptchaKey] = useState(0);
 
   // DM
   const [dmThreads, setDmThreads] = useState<DmThread[]>([]);
@@ -352,15 +356,23 @@ export default function NexoApp({
       const res = await apiFetch("/api/nexo/boards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName, description: newDesc }),
+        body: JSON.stringify({
+          name: newName,
+          description: newDesc,
+          captcha_token: boardCaptchaToken,
+          captcha_answer: boardCaptchaAnswer,
+        }),
       });
       const d = await res.json();
       if (!res.ok) {
         setError(d.error || "error al crear");
+        setBoardCaptchaKey((k) => k + 1);
         return;
       }
       setNewName("");
       setNewDesc("");
+      setBoardCaptchaAnswer("");
+      setBoardCaptchaKey((k) => k + 1);
       setShowCreate(false);
       await loadBoards();
       if (d.board?.id) {
@@ -953,6 +965,14 @@ export default function NexoApp({
                   onChange={(e) => setNewDesc(e.target.value)}
                   maxLength={400}
                   placeholder="de qué va este nexo"
+                />
+                <CaptchaField
+                  disabled={sending}
+                  refreshKey={boardCaptchaKey}
+                  onChange={(p) => {
+                    setBoardCaptchaToken(p.token);
+                    setBoardCaptchaAnswer(p.answer);
+                  }}
                 />
                 <div className="compose-toolbar">
                   <button className="btn" type="submit" disabled={sending}>

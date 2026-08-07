@@ -3655,3 +3655,44 @@ body.nexo-app-active footer {
   color: var(--green);
   font-size: 0.85rem;
 }
+
+/* captcha anti-bot */
+.captcha-field {
+  margin: 10px 0 6px;
+}
+
+.captcha-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.captcha-q {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--amber);
+  letter-spacing: 0.04em;
+  min-width: 5rem;
+  padding: 4px 10px;
+  border: 1px dashed var(--border);
+  background: color-mix(in srgb, var(--bg-deep, #020403) 80%, transparent);
+}
+
+.captcha-input {
+  width: 4.5rem !important;
+  text-align: center;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+}
+
+.captcha-refresh {
+  font-size: 0.85rem !important;
+  padding: 4px 10px !important;
+  min-width: auto;
+}
+
+.captcha-hint {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+}

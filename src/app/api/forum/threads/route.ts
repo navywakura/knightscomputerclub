@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { verifyCaptcha } from "@/lib/captcha";
 import { ensureSchema, getDb } from "@/lib/db";
 import { isOwnerUser } from "@/lib/ranks";
 
@@ -78,6 +79,14 @@ export async function POST(req: Request) {
     const categorySlug = String(body.category || body.category_slug || "").trim();
     const title = String(body.title || "").trim().slice(0, 200);
     const content = String(body.body || body.content || "").trim();
+
+    const captcha = verifyCaptcha(body.captcha_token, body.captcha_answer);
+    if (!captcha.ok) {
+      return NextResponse.json(
+        { error: captcha.error, code: "captcha" },
+        { status: 400 }
+      );
+    }
 
     if (!categorySlug || title.length < 3 || content.length < 3) {
       return NextResponse.json(

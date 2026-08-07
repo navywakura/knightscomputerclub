@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
+import { moderateImageBuffer } from "@/lib/nsfw";
 
 export const runtime = "nodejs";
+// moderación IA puede tardar
+export const maxDuration = 60;
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB
 const ALLOWED = new Set([
@@ -69,6 +72,19 @@ export async function POST(req: Request) {
 
     if (buf.length < 24) {
       return NextResponse.json({ error: "archivo vacío" }, { status: 400 });
+    }
+
+    // Automoderación NSFW (porno / gore) con IA
+    const mod = await moderateImageBuffer(buf, mime);
+    if (!mod.allowed) {
+      return NextResponse.json(
+        {
+          error: mod.reason || "imagen bloqueada por moderación NSFW",
+          code: "nsfw_blocked",
+          labels: mod.labels || [],
+        },
+        { status: 422 }
+      );
     }
 
     await ensureSchema();

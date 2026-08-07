@@ -17,6 +17,7 @@
     "bcryptjs": "^2.4.3",
     "jose": "^5.9.6",
     "next": "^15.1.0",
+    "openai": "^7.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",

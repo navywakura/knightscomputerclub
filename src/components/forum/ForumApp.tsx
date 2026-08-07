@@ -17,6 +17,7 @@ import ShareButton from "@/components/ShareButton";
 import { getRank, isOwnerUser, rankNameClass, rankPostClass, rankUserClass } from "@/lib/ranks";
 import { excerptBody } from "@/lib/markdown";
 import type { LinkPreview } from "@/lib/link-preview";
+import CaptchaField from "@/components/CaptchaField";
 import VipThemePicker from "@/components/VipThemePicker";
 import WiredBootScreen, { WIRED_BOOT_MIN_MS } from "@/components/WiredBootScreen";
 
@@ -143,6 +144,9 @@ export default function ForumApp({
   const [newBody, setNewBody] = useState("");
   const [newCat, setNewCat] = useState(initialBoard || "random");
   const [creating, setCreating] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaAnswer, setCaptchaAnswer] = useState("");
+  const [captchaKey, setCaptchaKey] = useState(0);
 
   // mobile: which column
   const [mobileCol, setMobileCol] = useState<"boards" | "list" | "detail">(
@@ -447,20 +451,26 @@ export default function ForumApp({
           category: newCat,
           title: newTitle,
           body: newBody,
+          captcha_token: captchaToken,
+          captcha_answer: captchaAnswer,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "error al crear hilo");
+        setCaptchaKey((k) => k + 1);
         return;
       }
       setNewTitle("");
       setNewBody("");
+      setCaptchaAnswer("");
+      setCaptchaKey((k) => k + 1);
       setBoardSlug(newCat);
       openThread(Number(data.thread.id));
       loadThreads(newCat);
     } catch {
       setError("red caída");
+      setCaptchaKey((k) => k + 1);
     } finally {
       setCreating(false);
     }
@@ -985,6 +995,14 @@ export default function ForumApp({
                       placeholder={
                         "primer mensaje (markdown OK)\n\n**bold** · `code` · [link](https://…)"
                       }
+                    />
+                    <CaptchaField
+                      disabled={creating}
+                      refreshKey={captchaKey}
+                      onChange={(p) => {
+                        setCaptchaToken(p.token);
+                        setCaptchaAnswer(p.answer);
+                      }}
                     />
                     <div className="compose-toolbar">
                       <ImageAttach

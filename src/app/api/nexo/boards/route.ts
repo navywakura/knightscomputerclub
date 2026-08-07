@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { verifyCaptcha } from "@/lib/captcha";
 import { ensureSchema, getDb } from "@/lib/db";
 import {
   canCreateNexoBoard,
@@ -62,6 +63,14 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json().catch(() => ({}));
+    const captcha = verifyCaptcha(body.captcha_token, body.captcha_answer);
+    if (!captcha.ok) {
+      return NextResponse.json(
+        { error: captcha.error, code: "captcha" },
+        { status: 400 }
+      );
+    }
+
     const name = String(body.name || "").trim().slice(0, NEXO_BOARD_NAME_MAX);
     const description = String(body.description || "")
       .trim()

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { verifyCaptcha } from "@/lib/captcha";
 import { ensureSchema, getDb } from "@/lib/db";
 import { previewsForPosts, type LinkPreview } from "@/lib/link-preview";
 import { safeNotifyMany } from "@/lib/notify";
@@ -83,6 +84,14 @@ export async function POST(req: Request) {
     const body = await req.json();
     const threadId = Number(body.thread_id || body.thread);
     const content = String(body.body || body.content || "").trim();
+
+    const captcha = verifyCaptcha(body.captcha_token, body.captcha_answer);
+    if (!captcha.ok) {
+      return NextResponse.json(
+        { error: captcha.error, code: "captcha" },
+        { status: 400 }
+      );
+    }
 
     if (!threadId || content.length < 1) {
       return NextResponse.json(
