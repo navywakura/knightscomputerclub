@@ -2,58 +2,81 @@
 
 Shell de terminal para **// nexo** en [knightscomputer.club](https://www.knightscomputer.club).
 
-Solo habla con el hub de tablones Nexo. **Avatar y banner de perfil se configuran desde esta CLI** (no hace falta la web, aunque la web sigue funcionando).
+> **Comando real: `kcc-cli`**  
+> En **macOS**, `kcc` es el cliente Kerberos (Heimdal) del sistema.  
+> Si corrés `kcc --version` y ves “Heimdal”, no es este package.
 
 ## Requisitos
 
-- Node.js **≥ 18**
+- **Node.js ≥ 18** ([nodejs.org](https://nodejs.org) o `nvm`)
+- `npm` y `curl` (mac/Linux) · PowerShell (Windows)
 - Cuenta en knightscomputer.club (email verificado para chatear)
 
-## Install
+## Install (recomendado)
 
-### Desde GitHub Release (recomendado)
+### macOS / Linux / WSL
 
 ```bash
-# VER = misma que en https://github.com/navywakura/knightscomputerclub/releases
-VER=1.2.0
-curl -fsSL -o kcc-cli-$VER.tgz \
-  "https://github.com/navywakura/knightscomputerclub/releases/download/v$VER/kcc-cli-$VER.tgz"
-npm i -g ./kcc-cli-$VER.tgz
-kcc --version
+curl -fsSL https://raw.githubusercontent.com/navywakura/knightscomputerclub/main/scripts/install-kcc-cli.sh | bash
 ```
 
-También en la web: [/descargar](https://www.knightscomputer.club/descargar).
+El script detecta la **última versión** del release (no hace falta `VER=` a mano).
+
+Versión fija:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/navywakura/knightscomputerclub/main/scripts/install-kcc-cli.sh | VER=1.3.1 bash
+```
+
+### Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/navywakura/knightscomputerclub/main/scripts/install-kcc-cli.ps1 | iex
+```
+
+### Manual (si sabés la versión)
+
+```bash
+# ⚠️ VER tiene que existir y no estar vacío
+VER=1.3.1
+curl -fsSL -o "kcc-cli-${VER}.tgz" \
+  "https://github.com/navywakura/knightscomputerclub/releases/download/v${VER}/kcc-cli-${VER}.tgz"
+npm i -g "./kcc-cli-${VER}.tgz"
+kcc-cli --version
+```
+
+Errores típicos:
+
+| síntoma | causa | fix |
+|---------|--------|-----|
+| `curl: 404` + `kcc-cli-.tgz` | `VER` vacío | usá el install.sh o `VER=1.3.1` |
+| `kcc` imprime Heimdal | macOS Kerberos | usá **`kcc-cli`** |
+| `command not found: kcc-cli` | npm global fuera del PATH | `export PATH="$(npm bin -g):$PATH"` o `~/.local/bin` |
+| `EACCES` al `npm i -g` | sin permisos en `/usr/local` | el install.sh cae a `~/.local`; o `npm config set prefix ~/.local` |
+| Node viejo | < 18 | actualizá Node |
+| curl 302 / tgz vacío | faltó seguir redirect | usá el install.sh (usa `curl -L`) |
 
 ### Desde el monorepo
 
 ```bash
 cd packages/kcc-cli
-npm link          # expone el binario `kcc` global
-# o sin link
-node bin/kcc.js
-```
-
-### Publicar un release (maintainers)
-
-Desde la raíz del repo:
-
-```bash
-npm run release          # minor + build Electron + pack CLI + gh release
-# docs: docs/release.md
+npm link
+kcc-cli --version
 ```
 
 ## Uso rápido
 
 ```bash
-kcc                    # shell interactiva
-kcc login roger '***'
-kcc boards
-kcc join general       # o id numérico
-# escribí mensajes; se actualizan solos cada ~3.5s
+kcc-cli                    # shell interactiva
+kcc-cli login roger '***'
+kcc-cli boards
+kcc-cli join general       # o id numérico
+# escribí mensajes; se actualizan solos
 
-kcc avatar ~/Pics/me.jpg
-kcc banner ~/Pics/wide.png   # solo VIP
-kcc nick "Nombre Visible"
+kcc-cli avatar ~/Pics/me.jpg
+kcc-cli banner ~/Pics/wide.png   # solo VIP
+kcc-cli nick "Nombre Visible"
+kcc-cli --version
 ```
 
 ## Shell (comandos)
@@ -79,7 +102,7 @@ kcc nick "Nombre Visible"
 Por defecto: `https://www.knightscomputer.club`
 
 ```bash
-kcc base http://localhost:3000   # dev local
+kcc-cli base http://localhost:3000   # dev local
 export KCC_API_URL=https://www.knightscomputer.club
 ```
 

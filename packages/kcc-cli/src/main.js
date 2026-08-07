@@ -26,13 +26,16 @@ async function main(argv) {
     case "--help":
       printHelp();
       console.log(`
-${c.dim("one-shot:")}
-  kcc login <user> <pass>
-  kcc boards
-  kcc join <slug>     (abre shell en ese board)
-  kcc avatar <file>
-  kcc banner <file>
-  kcc base <url>      (API base, default prod)
+${c.dim("one-shot (comando: kcc-cli):")}
+  kcc-cli login <user> <pass>
+  kcc-cli boards
+  kcc-cli join <slug>     (abre shell en ese board)
+  kcc-cli avatar <file>
+  kcc-cli banner <file>
+  kcc-cli base <url>      (API base, default prod)
+
+${c.dim("nota macOS:")} el binario del sistema se llama también \`kcc\` (Heimdal/Kerberos).
+  Usá siempre:  kcc-cli
 `);
       break;
 
@@ -123,6 +126,31 @@ ${c.dim("one-shot:")}
         /* */
       }
       console.log(`kcc-cli ${ver}`);
+      // si `which kcc` no es node, avisar (macOS Heimdal)
+      try {
+        const { execSync } = require("child_process");
+        const which = execSync("command -v kcc 2>/dev/null || true", {
+          encoding: "utf8",
+        }).trim();
+        if (which) {
+          const head = execSync(`head -c 80 "${which}" 2>/dev/null || true`, {
+            encoding: "utf8",
+          });
+          const isNode =
+            head.includes("node") ||
+            head.startsWith("#!") && head.includes("node");
+          if (!isNode) {
+            console.log(
+              c.warn(
+                `aviso: \`${which}\` NO es KCC (suele ser Kerberos/Heimdal en macOS).`
+              )
+            );
+            console.log(c.dim("usá siempre:  kcc-cli --version"));
+          }
+        }
+      } catch {
+        /* */
+      }
       console.log(banner());
       break;
     }

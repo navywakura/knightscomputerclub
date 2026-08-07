@@ -2,21 +2,7 @@
 "use strict";
 
 /**
- * kcc — CLI / shell para // nexo
- * Uso:
- *   kcc                 → shell interactiva
- *   kcc login
- *   kcc boards
- *   kcc join <slug|id>
- *   kcc avatar ./foto.jpg
- *   kcc banner ./vip.png
- *   kcc help
+ * Alias de kcc-cli.
+ * En macOS suele ganar el `kcc` de Heimdal (Kerberos) → usá `kcc-cli`.
  */
-
-const path = require("path");
-const { main } = require("../src/main");
-
-main(process.argv.slice(2)).catch((e) => {
-  console.error("kcc:", e.message || e);
-  process.exit(1);
-});
+require("./kcc-cli.js");

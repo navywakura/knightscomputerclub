@@ -1,8 +1,9 @@
 {
   "name": "kcc-cli",
-  "version": "1.3.0",
-  "description": "KCC CLI — shell de terminal para // nexo (knightscomputer.club)",
+  "version": "1.3.1",
+  "description": "KCC CLI — shell de terminal para // nexo (knightscomputer.club). Comando: kcc-cli (evita conflicto con Kerberos `kcc` en macOS).",
   "bin": {
+    "kcc-cli": "./bin/kcc-cli.js",
     "kcc": "./bin/kcc.js"
   },
   "type": "commonjs",

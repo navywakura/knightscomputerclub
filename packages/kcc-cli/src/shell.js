@@ -323,7 +323,7 @@ async function runShell(initialBoard = null) {
   }
 
   stopPoll();
-  console.log(c.dim("\n// kcc out"));
+  console.log(c.dim("\n// kcc-cli out"));
 }
 
 function printHelp() {

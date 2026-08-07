@@ -64,11 +64,15 @@ git push origin main
 ## Instalar CLI desde el release
 
 ```bash
-VER=1.3.0
-curl -fsSL -o kcc-cli-$VER.tgz \
-  "https://github.com/navywakura/knightscomputerclub/releases/download/v$VER/kcc-cli-$VER.tgz"
-npm i -g ./kcc-cli-$VER.tgz
-kcc --version
+# recomendado (mac/linux): detecta la última versión
+curl -fsSL https://raw.githubusercontent.com/navywakura/knightscomputerclub/main/scripts/install-kcc-cli.sh | bash
+
+# manual — VER no puede estar vacío
+VER=1.3.1
+curl -fsSL -o "kcc-cli-${VER}.tgz" \
+  "https://github.com/navywakura/knightscomputerclub/releases/download/v${VER}/kcc-cli-${VER}.tgz"
+npm i -g "./kcc-cli-${VER}.tgz"
+kcc-cli --version   # en macOS NO uses `kcc` (es Kerberos/Heimdal)
 ```
 
 ## Esquema de versiones

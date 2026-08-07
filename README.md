@@ -124,19 +124,22 @@ Lista completa y comentarios: [`.env.example`](.env.example)
 </details>
 
 <details>
-<summary><b>CLI kcc</b></summary>
+<summary><b>CLI kcc-cli</b></summary>
 
 ```bash
-# desde monorepo
-npm run kcc
-# o
-cd packages/kcc-cli && npm link
+# install (mac/linux) — detecta última versión sola
+curl -fsSL https://raw.githubusercontent.com/navywakura/knightscomputerclub/main/scripts/install-kcc-cli.sh | bash
 
-# desde release GitHub
-# https://github.com/navywakura/knightscomputerclub/releases
-npm i -g ./kcc-cli-1.3.0.tgz
-kcc login <user> <pass>
-kcc boards
+# Windows PowerShell
+# irm https://raw.githubusercontent.com/navywakura/knightscomputerclub/main/scripts/install-kcc-cli.ps1 | iex
+
+kcc-cli --version
+kcc-cli login <user> <pass>
+kcc-cli boards
+
+# monorepo
+npm run kcc-cli
+# macOS: NO uses el comando `kcc` del sistema (es Kerberos/Heimdal)
 ```
 
 </details>
