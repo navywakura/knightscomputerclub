@@ -106,50 +106,35 @@ export default function Header() {
       </div>
 
       <nav className="nav" aria-label="main">
-        {NAV.map((item) => {
-          const active =
-            item.href === "/"
-              ? path === "/"
-              : path === item.href || path.startsWith(item.href + "/");
-          // hide login/register when logged in
-          if (user && (item.href === "/auth/login" || item.href === "/auth/register")) {
-            return null;
+        {(() => {
+          const items: Array<{ href: string; label: string }> = [];
+          for (const item of NAV) {
+            if (user && (item.href === "/auth/login" || item.href === "/auth/register")) {
+              continue;
+            }
+            // /forum solo para usuarios registrados
+            if (!user && item.href === "/forum") continue;
+            items.push(item);
           }
-          // /forum solo para usuarios registrados
-          if (!user && item.href === "/forum") {
-            return null;
+          if (user) items.push({ href: "/forum/new", label: "new_thread" });
+          if (user && isOwnerUser(user)) {
+            items.push({ href: "/admin", label: "admin" });
           }
-          return (
-            <span key={item.href}>
-              <span className="sep">|</span>
-              <Link href={item.href} className={active ? "active" : ""}>
-                {item.label}
-              </Link>
-            </span>
-          );
-        })}
-        {user && (
-          <>
-            <span className="sep">|</span>
-            <Link
-              href="/forum/new"
-              className={path.startsWith("/forum/new") ? "active" : ""}
-            >
-              new_thread
-            </Link>
-          </>
-        )}
-        {user && isOwnerUser(user) && (
-          <>
-            <span className="sep">|</span>
-            <Link
-              href="/admin"
-              className={path.startsWith("/admin") ? "active" : ""}
-            >
-              admin
-            </Link>
-          </>
-        )}
+          return items.map((item, i) => {
+            const active =
+              item.href === "/"
+                ? path === "/"
+                : path === item.href || path.startsWith(item.href + "/");
+            return (
+              <span key={item.href}>
+                {i > 0 && <span className="sep">|</span>}
+                <Link href={item.href} className={active ? "active" : ""}>
+                  {item.label}
+                </Link>
+              </span>
+            );
+          });
+        })()}
       </nav>
 
       <div className="ticker" aria-hidden>
