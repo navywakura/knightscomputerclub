@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "db:setup": "node scripts/setup-db.mjs",
+    "db:seed-threads": "node scripts/seed-threads.mjs",
     "kcc": "node packages/kcc-cli/bin/kcc-cli.js",
     "kcc-cli": "node packages/kcc-cli/bin/kcc-cli.js",
     "release": "node scripts/release.mjs",

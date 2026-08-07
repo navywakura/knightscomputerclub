@@ -197,6 +197,9 @@ async function main() {
     `;
   }
   console.log("[kc] categorías seed/upsert OK (incl. offtopic)");
+  console.log(
+    "[kc] hilos semilla: corré `npm run db:seed-threads` tras tener un usuario (roger)"
+  );
 
   const owners = await sql`
     UPDATE users

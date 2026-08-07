@@ -85,6 +85,13 @@ export default function SettingsApp({ initialTab = "profile" }: Props) {
   const [notifyPerm, setNotifyPerm] = useState<string>("");
   const [uiSfx, setUiSfx] = useState(true);
 
+  // email change / OTP
+  const [newEmail, setNewEmail] = useState("");
+  const [emailOtp, setEmailOtp] = useState("");
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [otpDevHint, setOtpDevHint] = useState("");
+
   const vip = Boolean(me?.is_vip || me?.role === "owner");
 
   const loadMe = useCallback(async () => {
@@ -254,6 +261,145 @@ export default function SettingsApp({ initialTab = "profile" }: Props) {
       setError("red caída");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function requestEmailChange() {
+    setEmailBusy(true);
+    setError("");
+    setOk("");
+    setOtpDevHint("");
+    try {
+      const res = await apiFetch("/api/auth/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "request_change",
+          email: newEmail.trim(),
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error || "no se pudo pedir el cambio");
+        return;
+      }
+      setPendingEmail(d.pending_email || newEmail.trim().toLowerCase());
+      setOk(d.message || "OTP enviado al nuevo correo");
+      if (d.code_dev) {
+        setOtpDevHint(`dev OTP: ${d.code_dev}`);
+      }
+    } catch {
+      setError("red caída");
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
+  async function confirmEmailChange() {
+    setEmailBusy(true);
+    setError("");
+    setOk("");
+    try {
+      const res = await apiFetch("/api/auth/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "confirm_change",
+          code: emailOtp.trim(),
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error || "código inválido");
+        return;
+      }
+      if (d.user) setMe(d.user as Me);
+      setOk(d.message || "email actualizado");
+      setPendingEmail(null);
+      setNewEmail("");
+      setEmailOtp("");
+      setOtpDevHint("");
+    } catch {
+      setError("red caída");
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
+  async function resendVerifyOtp() {
+    setEmailBusy(true);
+    setError("");
+    setOk("");
+    setOtpDevHint("");
+    try {
+      const res = await apiFetch("/api/auth/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resend_verify" }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error || "no se pudo enviar OTP");
+        return;
+      }
+      if (d.already) {
+        setOk("email ya verificado");
+      } else {
+        setOk(d.message || "OTP reenviado");
+      }
+      if (d.code_dev) setOtpDevHint(`dev OTP: ${d.code_dev}`);
+    } catch {
+      setError("red caída");
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
+  async function confirmVerifyOtp() {
+    setEmailBusy(true);
+    setError("");
+    setOk("");
+    try {
+      // si hay cambio pendiente, usar confirm_change; si no, verify clásico
+      if (pendingEmail) {
+        const res = await apiFetch("/api/auth/email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "confirm_change",
+            code: emailOtp.trim(),
+          }),
+        });
+        const d = await res.json();
+        if (!res.ok) {
+          setError(d.error || "código inválido");
+          return;
+        }
+        if (d.user) setMe(d.user as Me);
+        setOk(d.message || "email actualizado");
+        setPendingEmail(null);
+        setNewEmail("");
+        setEmailOtp("");
+        return;
+      }
+      const res = await apiFetch("/api/auth/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "confirm", code: emailOtp.trim() }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error || "código inválido");
+        return;
+      }
+      if (d.user) setMe(d.user as Me);
+      setOk("email verificado");
+      setEmailOtp("");
+      setOtpDevHint("");
+    } catch {
+      setError("red caída");
+    } finally {
+      setEmailBusy(false);
     }
   }
 
@@ -665,6 +811,111 @@ export default function SettingsApp({ initialTab = "profile" }: Props) {
 
       {tab === "privacy" && (
         <form className="settings-form" onSubmit={saveProfile}>
+          <h3 className="settings-sub">correo electrónico</h3>
+          <p className="muted" style={{ fontSize: "0.9rem" }}>
+            Actual: <code>{me.email || "—"}</code>
+            {me.email_verified ? (
+              <span className="tag ok" style={{ marginLeft: 8 }}>
+                verificado
+              </span>
+            ) : (
+              <span className="tag" style={{ marginLeft: 8 }}>
+                sin verificar
+              </span>
+            )}
+          </p>
+          {!me.email_verified && (
+            <div className="settings-email-block">
+              <p className="form-error" style={{ marginTop: 0 }}>
+                verificá tu email para publicar y chatear en nexo.
+              </p>
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={emailBusy}
+                onClick={() => void resendVerifyOtp()}
+              >
+                {emailBusy ? "…" : "[ enviar / reenviar OTP ]"}
+              </button>
+              <div className="settings-inline" style={{ marginTop: 10 }}>
+                <input
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="\d{6}"
+                  maxLength={6}
+                  placeholder="código 6 dígitos"
+                  value={emailOtp}
+                  onChange={(e) =>
+                    setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                />
+                <button
+                  className="btn"
+                  type="button"
+                  disabled={emailBusy || emailOtp.length !== 6}
+                  onClick={() => void confirmVerifyOtp()}
+                >
+                  confirmar
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="settings-email-block">
+            <p className="muted" style={{ fontSize: "0.9rem" }}>
+              Cambiar email: enviamos un OTP al correo <strong>nuevo</strong>.
+              El cambio se aplica al confirmar el código.
+            </p>
+            {pendingEmail && (
+              <p className="form-ok" style={{ margin: "6px 0" }}>
+                pendiente → <code>{pendingEmail}</code>
+              </p>
+            )}
+            <div className="settings-inline" style={{ marginBottom: 8 }}>
+              <input
+                type="email"
+                autoComplete="email"
+                placeholder="nuevo@email.com"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={emailBusy || !newEmail.trim()}
+                onClick={() => void requestEmailChange()}
+              >
+                {emailBusy ? "…" : "enviar OTP"}
+              </button>
+            </div>
+            <div className="settings-inline">
+              <input
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="\d{6}"
+                maxLength={6}
+                placeholder="OTP del email nuevo"
+                value={emailOtp}
+                onChange={(e) =>
+                  setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                }
+              />
+              <button
+                type="button"
+                className="btn"
+                disabled={emailBusy || emailOtp.length !== 6 || !pendingEmail}
+                onClick={() => void confirmEmailChange()}
+              >
+                aplicar cambio
+              </button>
+            </div>
+            {otpDevHint ? (
+              <p className="muted" style={{ fontSize: "0.8rem", marginTop: 8 }}>
+                {otpDevHint}
+              </p>
+            ) : null}
+          </div>
+
           <h3 className="settings-sub">mensajes privados</h3>
           <p className="muted" style={{ fontSize: "0.9rem" }}>
             Quién puede abrirte un DM en // nexo. Si elegís solo amigos, el
@@ -753,13 +1004,19 @@ export default function SettingsApp({ initialTab = "profile" }: Props) {
           <h3 className="settings-sub">cuenta</h3>
           <p className="muted">
             email: {me.email || "—"} · id #{me.id}
+            {me.email_verified ? " · verificado" : " · sin verificar"}
           </p>
-          {!me.email_verified && (
-            <p className="form-error">
-              verificá tu email (OTP en registro/login) para publicar y
-              chatear en nexo.
-            </p>
-          )}
+          <p className="muted" style={{ fontSize: "0.9rem" }}>
+            Para cambiar o verificar el correo usá la pestaña{" "}
+            <button
+              type="button"
+              className="linkish"
+              onClick={() => setTab("privacy")}
+            >
+              privacidad
+            </button>
+            .
+          </p>
           <h3 className="settings-sub">zona de peligro</h3>
           <p className="muted" style={{ fontSize: "0.9rem" }}>
             Soft-delete: la cuenta se borra en 7 días. Login antes de eso la

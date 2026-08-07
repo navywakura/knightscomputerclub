@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Panel from "@/components/Panel";
+import { getDb } from "@/lib/db";
 
 export const metadata: Metadata = {
   title: {
@@ -18,6 +19,9 @@ export const metadata: Metadata = {
   },
 };
 
+/** Revalida censo cada minuto — home se siente viva sin martillar Neon. */
+export const revalidate = 60;
+
 const ASCII = `
  ██╗  ██╗ ██████╗
  ██║ ██╔╝██╔════╝
@@ -28,13 +32,92 @@ const ASCII = `
  knightscomputer.club // underground node
 `;
 
-export default function HomePage() {
+type LobbyStats = {
+  users: number;
+  threads: number;
+  posts: number;
+  online: number;
+  boards: number;
+};
+
+async function getLobbyStats(): Promise<LobbyStats> {
+  const empty: LobbyStats = {
+    users: 0,
+    threads: 0,
+    posts: 0,
+    online: 0,
+    boards: 0,
+  };
+  if (!process.env.DATABASE_URL?.trim()) return empty;
+
+  try {
+    const db = getDb();
+    const rows = await db`
+      SELECT
+        (SELECT COUNT(*)::int
+           FROM users
+          WHERE banned IS NOT TRUE
+            AND deleted_at IS NULL) AS users,
+        (SELECT COUNT(*)::int FROM threads) AS threads,
+        (SELECT COUNT(*)::int FROM posts) AS posts,
+        (SELECT COUNT(*)::int
+           FROM users
+          WHERE banned IS NOT TRUE
+            AND deleted_at IS NULL
+            AND last_seen IS NOT NULL
+            AND last_seen > NOW() - INTERVAL '15 minutes') AS online,
+        (SELECT COUNT(*)::int FROM categories) AS boards
+    `;
+    const r = rows[0];
+    return {
+      users: Number(r?.users ?? 0),
+      threads: Number(r?.threads ?? 0),
+      posts: Number(r?.posts ?? 0),
+      online: Number(r?.online ?? 0),
+      boards: Number(r?.boards ?? 0),
+    };
+  } catch (e) {
+    // fallback si deleted_at / last_seen no existen aún
+    try {
+      const db = getDb();
+      const rows = await db`
+        SELECT
+          (SELECT COUNT(*)::int FROM users WHERE banned IS NOT TRUE) AS users,
+          (SELECT COUNT(*)::int FROM threads) AS threads,
+          (SELECT COUNT(*)::int FROM posts) AS posts,
+          (SELECT COUNT(*)::int FROM categories) AS boards
+      `;
+      const r = rows[0];
+      return {
+        users: Number(r?.users ?? 0),
+        threads: Number(r?.threads ?? 0),
+        posts: Number(r?.posts ?? 0),
+        online: 0,
+        boards: Number(r?.boards ?? 0),
+      };
+    } catch (e2) {
+      console.error("[lobby stats]", e, e2);
+      return empty;
+    }
+  }
+}
+
+/** Contador estilo LED / BBS clásico */
+function padCount(n: number, width = 4): string {
+  const s = String(Math.max(0, Math.floor(n)));
+  return s.length >= width ? s : s.padStart(width, "0");
+}
+
+export default async function HomePage() {
+  const stats = await getLobbyStats();
+
   return (
     <div className="lobby-home">
       <div className="lobby-marquee" aria-hidden>
         <span>
           ★ PLEASE HOLD ★ ELEVATOR MUSIC ★ GROUND FLOOR · FORUM · DONATE ★
-          WELCOME TO THE LOBBY ★ NON-COPYRIGHT JAZZ ★
+          WELCOME TO THE LOBBY ★ {padCount(stats.users)} OPERATORS ONLINE IN
+          THE BOOKS ★ NON-COPYRIGHT JAZZ ★
         </span>
       </div>
 
@@ -59,6 +142,63 @@ export default function HomePage() {
           ambientación elevador / waiting room · al entrar al foro o donate el
           tono vuelve al terminal verde
         </p>
+
+        {/* Censo del nodo — ancla social / prueba de vida */}
+        <aside className="lobby-census" aria-label="Censo del nodo">
+          <div className="lobby-census-head">
+            <span className="lobby-census-live" aria-hidden>
+              <span className="lobby-census-pulse" />
+              LIVE
+            </span>
+            <span className="lobby-census-label">// node census</span>
+            <span className="lobby-census-hint muted">
+              operadores registrados · señal del foro
+            </span>
+          </div>
+
+          <div className="lobby-census-hero">
+            <div className="lobby-census-hero-num" title="usuarios registrados">
+              {padCount(stats.users)}
+            </div>
+            <div className="lobby-census-hero-meta">
+              <div className="lobby-census-hero-title">operadores en el nodo</div>
+              <p className="lobby-census-hero-copy">
+                {stats.users === 0
+                  ? "El libro de registros está vacío — sé el primero en firmar."
+                  : stats.users === 1
+                    ? "Un operador ya está adentro. El nodo crece con cada cuenta."
+                    : `${stats.users} cuentas activas. Sin algoritmos: solo gente real.`}
+              </p>
+              <Link href="/auth/register" className="lobby-census-cta">
+                → unirse al censo / crear cuenta
+              </Link>
+            </div>
+          </div>
+
+          <div className="stat-row lobby-census-stats">
+            <div className="stat lobby-stat-hot" title="usuarios registrados">
+              <div className="n">{padCount(stats.users)}</div>
+              <div className="l">registrados</div>
+            </div>
+            <div className="stat" title="en línea (15 min)">
+              <div className="n">{padCount(stats.online, 3)}</div>
+              <div className="l">en línea</div>
+            </div>
+            <div className="stat" title="hilos del foro">
+              <div className="n">{padCount(stats.threads)}</div>
+              <div className="l">hilos</div>
+            </div>
+            <div className="stat" title="mensajes / posts">
+              <div className="n">{padCount(stats.posts)}</div>
+              <div className="l">posts</div>
+            </div>
+            <div className="stat" title="boards / categorías">
+              <div className="n">{padCount(stats.boards, 3)}</div>
+              <div className="l">boards</div>
+            </div>
+          </div>
+        </aside>
+
         <div className="btn-row">
           <Link href="/donate" className="btn amber">
             [ donar ]
@@ -139,7 +279,8 @@ export default function HomePage() {
       </Panel>
 
       <div className="under-const lobby-const">
-        ★ LOBBY OPEN ★ — elevator music playing — ★ PLEASE TAKE A SEAT ★
+        ★ LOBBY OPEN ★ — elevator music playing — ★{" "}
+        {padCount(stats.users)} OPERATORS ON FILE ★ PLEASE TAKE A SEAT ★
       </div>
     </div>
   );

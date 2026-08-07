@@ -3,6 +3,9 @@
  * Evita acoplar UI a APIs de ventana; en Electron se puede reimplementar.
  */
 
+/** Breakpoint alineado con CSS móvil del nodo (px). */
+export const PHONE_MAX_WIDTH = 720;
+
 export function getStorage(): Storage | null {
   if (typeof window === "undefined") return null;
   try {
@@ -32,6 +35,53 @@ export function isDesktopShell(): boolean {
     return true;
   }
   return false;
+}
+
+/**
+ * ¿Viewport / UA de teléfono?
+ * Preferí ancho (matchMedia); UA cubre tablets en landscape raras.
+ */
+export function isPhoneDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    if (window.matchMedia(`(max-width: ${PHONE_MAX_WIDTH}px)`).matches) {
+      return true;
+    }
+  } catch {
+    /* */
+  }
+  if (typeof navigator !== "undefined") {
+    const ua = navigator.userAgent || "";
+    if (
+      /iPhone|iPod|Android.*Mobile|Windows Phone|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
+        ua
+      )
+    ) {
+      return true;
+    }
+    // iPadOS 13+ se reporta como Mac; touch + coarse pointer
+    if (
+      /iPad|Tablet/i.test(ua) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+    ) {
+      try {
+        if (window.matchMedia(`(max-width: 960px)`).matches) return true;
+      } catch {
+        /* */
+      }
+    }
+  }
+  return false;
+}
+
+/** Ancho de viewport tipo teléfono (sin mirar UA). */
+export function isPhoneViewport(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.matchMedia(`(max-width: ${PHONE_MAX_WIDTH}px)`).matches;
+  } catch {
+    return window.innerWidth <= PHONE_MAX_WIDTH;
+  }
 }
 
 export async function apiFetch(

@@ -33,6 +33,7 @@ import {
 } from "@/lib/nexo";
 import { parseNexoCommand } from "@/lib/nexo-commands";
 import { apiFetch, getStorage } from "@/lib/platform";
+import { useIsPhone } from "@/lib/use-phone";
 import { getRank, rankNameClass } from "@/lib/ranks";
 import { playUiSfx } from "@/lib/ui-sfx";
 import { useRouter } from "next/navigation";
@@ -119,8 +120,13 @@ export default function NexoApp({
   initialBoardSlug = null,
   initialDmUser = null,
 }: Props) {
+  const isPhone = useIsPhone();
   const [me, setMe] = useState<Me | null>(null);
   const [tab, setTab] = useState<Tab>("boards");
+  /** en teléfono: lista | chat | miembros */
+  const [mobilePane, setMobilePane] = useState<"list" | "chat" | "members">(
+    "list"
+  );
   const [boards, setBoards] = useState<Board[]>([]);
   const [canCreate, setCanCreate] = useState(false);
   const [boardId, setBoardId] = useState<number | null>(null);
@@ -806,6 +812,7 @@ export default function NexoApp({
     setMembers([]);
     lastIdRef.current = 0;
     setTab("boards");
+    setMobilePane("chat");
     void joinBoard(id);
   }
 
@@ -840,6 +847,7 @@ export default function NexoApp({
     setDmUnlocked(unlocked);
     if (!unlocked) setDmPin("");
     setTab("dm");
+    setMobilePane("chat");
   }
 
   const activeBoard = boards.find((b) => b.id === boardId) || null;
@@ -1057,7 +1065,10 @@ export default function NexoApp({
           <button
             type="button"
             className={tab === "boards" ? "on" : ""}
-            onClick={() => setTab("boards")}
+            onClick={() => {
+              setTab("boards");
+              setMobilePane("list");
+            }}
           >
             boards
           </button>
@@ -1066,6 +1077,7 @@ export default function NexoApp({
             className={tab === "dm" ? "on" : ""}
             onClick={() => {
               setTab("dm");
+              setMobilePane("list");
               loadDmList();
             }}
           >
@@ -1076,6 +1088,7 @@ export default function NexoApp({
             className={tab === "friends" ? "on" : ""}
             onClick={() => {
               setTab("friends");
+              setMobilePane("list");
               void loadFriends();
             }}
           >
@@ -1147,13 +1160,43 @@ export default function NexoApp({
         </div>
       )}
 
+      {/* tabs de pane en teléfono */}
+      <div className="nexo-mobile-tabs" aria-label="navegación nexo móvil">
+        <button
+          type="button"
+          className={mobilePane === "list" ? "on" : ""}
+          onClick={() => setMobilePane("list")}
+        >
+          lista
+        </button>
+        <button
+          type="button"
+          className={mobilePane === "chat" ? "on" : ""}
+          onClick={() => setMobilePane("chat")}
+          disabled={tab === "friends" || (tab === "boards" ? !boardId : !dmId)}
+        >
+          chat
+        </button>
+        {tab === "boards" && boardId ? (
+          <button
+            type="button"
+            className={mobilePane === "members" ? "on" : ""}
+            onClick={() => setMobilePane("members")}
+          >
+            miembros
+          </button>
+        ) : null}
+      </div>
+
       <div
         className={`nexo-grid${
           tab === "boards" && boardId ? " has-members" : ""
-        }`}
+        }${isPhone ? ` mobile-pane-${mobilePane}` : ""}`}
       >
         {/* sidebar */}
-        <aside className="nexo-side">
+        <aside
+          className={`nexo-side${mobilePane === "list" ? " show-mobile" : ""}`}
+        >
           <div className="forum-pane-head">
             {tab === "boards"
               ? "tablones // nexo"
@@ -1389,8 +1432,19 @@ export default function NexoApp({
         </aside>
 
         {/* chat */}
-        <section className="nexo-chat">
+        <section
+          className={`nexo-chat${mobilePane === "chat" ? " show-mobile" : ""}`}
+        >
           <div className="forum-pane-head">
+            {isPhone && (boardId || dmId) && tab !== "friends" ? (
+              <button
+                type="button"
+                className="forum-mini-btn nexo-back-btn"
+                onClick={() => setMobilePane("list")}
+              >
+                ← lista
+              </button>
+            ) : null}
             {tab === "friends" ? (
               <span>amigos · DMs requieren amistad si el peer lo exige</span>
             ) : tab === "boards" ? (
@@ -1748,8 +1802,21 @@ export default function NexoApp({
 
         {/* member list del board */}
         {tab === "boards" && boardId ? (
-          <aside className="nexo-members">
+          <aside
+            className={`nexo-members${
+              mobilePane === "members" ? " show-mobile" : ""
+            }`}
+          >
             <div className="forum-pane-head">
+              {isPhone ? (
+                <button
+                  type="button"
+                  className="forum-mini-btn nexo-back-btn"
+                  onClick={() => setMobilePane("chat")}
+                >
+                  ← chat
+                </button>
+              ) : null}
               miembros · {members.filter((m) => m.online).length} online
             </div>
             <ul className="nexo-members-list">

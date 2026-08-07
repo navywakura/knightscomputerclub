@@ -1,5 +1,6 @@
 import { neon, NeonQueryFunction } from "@neondatabase/serverless";
 import { syncAllNexoBoardsToForum } from "@/lib/nexo-forum";
+import { seedForumThreads } from "@/lib/seed-threads";
 
 let sql: NeonQueryFunction<false, false> | null = null;
 let nexoSql: NeonQueryFunction<false, false> | null = null;
@@ -233,6 +234,11 @@ export async function ensureSchema() {
   await db`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS email_otp_expires TIMESTAMPTZ
+  `;
+  // Cambio de email pendiente (OTP al correo nuevo)
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS pending_email VARCHAR(255)
   `;
   await db`
     ALTER TABLE users
@@ -472,6 +478,21 @@ export async function ensureSchema() {
 
   // Seed / upsert categorías (incluye jerarquía offtopic + nexo)
   await seedCategories(db);
+
+  // Hilos semilla: 1 vez por versión (app_meta). Barato si ya corrió.
+  try {
+    const seedResult = await seedForumThreads(db);
+    if (!seedResult.alreadyDone && (seedResult.created > 0 || seedResult.repliesCreated > 0)) {
+      console.log(
+        `[ensureSchema] forum seeds: +${seedResult.created} threads, +${seedResult.repliesCreated} replies`
+      );
+    }
+    if (seedResult.error) {
+      console.error("[ensureSchema] seed forum threads:", seedResult.error);
+    }
+  } catch (e) {
+    console.error("[ensureSchema] seed forum threads", e);
+  }
 
   // Boards viejos de nexo → también en el foro bajo // nexo
   try {

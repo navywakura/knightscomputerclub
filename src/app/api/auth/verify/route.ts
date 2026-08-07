@@ -44,6 +44,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         ok: true,
         message: "código enviado a tu email",
+        ...(r.codeDev ? { code_dev: r.codeDev } : {}),
       });
     }
 

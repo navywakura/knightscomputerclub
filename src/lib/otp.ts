@@ -10,20 +10,30 @@ export function generateOtpCode(): string {
 
 export async function issueEmailOtp(
   db: NeonQueryFunction<false, false>,
-  user: { id: number; email: string; username: string }
-): Promise<{ ok: true } | { ok: false; error: string }> {
+  user: { id: number; email: string; username: string },
+  opts?: { toEmail?: string; purpose?: "verify" | "change" }
+): Promise<{ ok: true; codeDev?: string } | { ok: false; error: string }> {
   const code = generateOtpCode();
   const hash = await bcrypt.hash(code, 8);
   const exp = new Date(Date.now() + OTP_TTL_MS).toISOString();
+  const to = (opts?.toEmail || user.email).trim().toLowerCase();
+  if (!to || !to.includes("@")) {
+    return { ok: false, error: "email inválido para OTP" };
+  }
   await db`
     UPDATE users
     SET email_otp_hash = ${hash},
         email_otp_expires = ${exp}::timestamptz
     WHERE id = ${user.id}
   `;
-  const sent = await sendOtpEmail(user.email, code, user.username);
+  const purpose = opts?.purpose || "verify";
+  const sent = await sendOtpEmail(to, code, user.username, purpose);
   if (!sent.ok) {
     return { ok: false, error: sent.error || "no se pudo enviar OTP" };
+  }
+  // En dev sin Resend el código va a logs; devolvemos hint solo fuera de prod
+  if (process.env.NODE_ENV !== "production" && !process.env.RESEND_API_KEY) {
+    return { ok: true, codeDev: code };
   }
   return { ok: true };
 }

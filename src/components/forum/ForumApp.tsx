@@ -20,6 +20,7 @@ import type { LinkPreview } from "@/lib/link-preview";
 import CaptchaField from "@/components/CaptchaField";
 import VipThemePicker from "@/components/VipThemePicker";
 import WiredBootScreen, { WIRED_BOOT_MIN_MS } from "@/components/WiredBootScreen";
+import { useIsPhone } from "@/lib/use-phone";
 
 export type ForumCategory = {
   id: number;
@@ -153,6 +154,8 @@ export default function ForumApp({
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [captchaKey, setCaptchaKey] = useState(0);
+
+  const isPhone = useIsPhone();
 
   // mobile: which column
   const [mobileCol, setMobileCol] = useState<"boards" | "list" | "detail">(
@@ -612,14 +615,15 @@ export default function ForumApp({
           className={mobileCol === "list" ? "on" : ""}
           onClick={() => setMobileCol("list")}
         >
-          threads
+          hilos
         </button>
         <button
           type="button"
           className={mobileCol === "detail" ? "on" : ""}
           onClick={() => setMobileCol("detail")}
+          disabled={!threadId && mode !== "new"}
         >
-          posts
+          {mode === "new" ? "nuevo" : "posts"}
         </button>
       </div>
 
@@ -915,6 +919,15 @@ export default function ForumApp({
                   posts · {thread.title}
                 </span>
                 <div className="forum-detail-tools">
+                  {isPhone && (
+                    <button
+                      type="button"
+                      className="forum-mini-btn"
+                      onClick={() => setMobileCol("list")}
+                    >
+                      ← hilos
+                    </button>
+                  )}
                   {boardSlug && (
                     <button
                       type="button"

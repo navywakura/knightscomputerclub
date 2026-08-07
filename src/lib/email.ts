@@ -59,14 +59,26 @@ export async function sendEmail(opts: {
   }
 }
 
-export async function sendOtpEmail(to: string, code: string, username: string) {
+export async function sendOtpEmail(
+  to: string,
+  code: string,
+  username: string,
+  purpose: "verify" | "change" = "verify"
+) {
+  const isChange = purpose === "change";
+  const subject = isChange
+    ? `[knightscomputer.club] confirmar nuevo email: ${code}`
+    : `[knightscomputer.club] código de verificación: ${code}`;
+  const line = isChange
+    ? "Tu código OTP para confirmar el cambio de correo es:"
+    : "Tu código OTP para verificar la cuenta es:";
   return sendEmail({
     to,
-    subject: `[knightscomputer.club] código de verificación: ${code}`,
+    subject,
     text: [
       `Hola @${username},`,
       ``,
-      `Tu código OTP para verificar la cuenta es:`,
+      line,
       ``,
       `  ${code}`,
       ``,
@@ -77,7 +89,7 @@ export async function sendOtpEmail(to: string, code: string, username: string) {
     html: `
       <div style="font-family:monospace;background:#050805;color:#b8ffc8;padding:24px">
         <p>Hola <strong>@${escapeHtml(username)}</strong>,</p>
-        <p>Tu código OTP:</p>
+        <p>${escapeHtml(line)}</p>
         <p style="font-size:28px;letter-spacing:0.2em;color:#33ff66"><strong>${escapeHtml(code)}</strong></p>
         <p style="color:#5a8a62">Válido 15 minutos.</p>
       </div>
