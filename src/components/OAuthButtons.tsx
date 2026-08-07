@@ -34,12 +34,28 @@ export default function OAuthButtons() {
     <div className="oauth-row">
       {status.google ? (
         <a className="btn secondary oauth-btn" href="/api/auth/oauth/google">
-          [ Google ]
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icons/google.png"
+            alt=""
+            width={18}
+            height={18}
+            className="oauth-btn-icon"
+          />
+          Google
         </a>
       ) : null}
       {status.github ? (
         <a className="btn secondary oauth-btn" href="/api/auth/oauth/github">
-          [ GitHub ]
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icons/github.png"
+            alt=""
+            width={18}
+            height={18}
+            className="oauth-btn-icon"
+          />
+          GitHub
         </a>
       ) : null}
     </div>

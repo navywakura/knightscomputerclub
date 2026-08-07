@@ -1487,6 +1487,17 @@ textarea {
 .oauth-btn {
   text-transform: none;
   letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.oauth-btn-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
 }
 
 .share-btn {
