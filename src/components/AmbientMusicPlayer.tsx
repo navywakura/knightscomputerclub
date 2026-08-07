@@ -14,6 +14,8 @@ type SavedState = {
   currentTime: number;
   volume: number;
   muted: boolean;
+  /** player colapsado a pastilla (sigue sonando) */
+  minimized: boolean;
 };
 
 const DEFAULT_SAVED: SavedState = {
@@ -23,6 +25,7 @@ const DEFAULT_SAVED: SavedState = {
   currentTime: 0,
   volume: 0.35,
   muted: false,
+  minimized: false,
 };
 
 /**
@@ -67,6 +70,7 @@ function readSaved(): SavedState {
       currentTime: Math.max(0, Number(p.currentTime) || 0),
       volume: Math.min(1, Math.max(0, Number(p.volume) ?? 0.35)),
       muted: Boolean(p.muted),
+      minimized: Boolean(p.minimized),
     };
   } catch {
     return { ...DEFAULT_SAVED };
@@ -84,6 +88,7 @@ function writeSaved(patch: Partial<SavedState>) {
       currentTime: patch.currentTime ?? prev.currentTime,
       volume: patch.volume ?? prev.volume,
       muted: patch.muted ?? prev.muted,
+      minimized: patch.minimized ?? prev.minimized,
     };
     localStorage.setItem(STATE_KEY, JSON.stringify(next));
   } catch {
@@ -99,6 +104,7 @@ function persistNow() {
     currentTime: shared.currentTime,
     volume: shared.volume,
     muted: shared.muted,
+    // minimized se guarda al toggle; no lo pisa acá
   });
 }
 
@@ -228,6 +234,7 @@ export default function AmbientMusicPlayer() {
   const [muted, setMuted] = useState(shared.muted);
   const [volume, setVolume] = useState(shared.volume);
   const [expanded, setExpanded] = useState(false);
+  const [minimized, setMinimized] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const lastSave = useRef(0);
@@ -286,6 +293,7 @@ export default function AmbientMusicPlayer() {
     setVolume(shared.volume);
     setMuted(shared.muted);
     setIndex(shared.index);
+    setMinimized(Boolean(saved.minimized));
 
     const a = getAudio();
     if (a) {
@@ -564,23 +572,80 @@ export default function AmbientMusicPlayer() {
 
   const isHome = path === "/" || path === "";
 
+  function setMinimizedPersist(next: boolean) {
+    setMinimized(next);
+    writeSaved({ minimized: next });
+    if (next) setExpanded(false);
+  }
+
   return (
     <div
       className={`muzak-player${expanded ? " expanded" : ""}${
-        isHome ? " lobby" : " node"
-      }`}
+        minimized ? " minimized" : ""
+      }${isHome ? " lobby" : " node"}`}
       role="region"
       aria-label="Ambient music player"
     >
-      <button
-        type="button"
-        className="muzak-toggle"
-        onClick={() => setExpanded((x) => !x)}
-        title={expanded ? "minimizar" : "expandir player"}
-        aria-expanded={expanded}
-      >
-        {isHome ? "♪ LOBBY" : "♪ NODE"}
-      </button>
+      {minimized ? (
+        <div className="muzak-mini">
+          <button
+            type="button"
+            className="muzak-btn play"
+            onClick={toggle}
+            title={playing ? "pausa" : "play"}
+            aria-label={playing ? "pausa" : "play"}
+          >
+            {playing ? "❚❚" : "▶"}
+          </button>
+          <button
+            type="button"
+            className="muzak-mini-label"
+            onClick={() => setMinimizedPersist(false)}
+            title="abrir reproductor"
+          >
+            <span className="muzak-mini-icon" aria-hidden>
+              ♪
+            </span>
+            <span className="muzak-mini-title">
+              {track?.title || (isHome ? "LOBBY" : "NODE")}
+            </span>
+            {playing ? <span className="muzak-mini-eq" aria-hidden /> : null}
+          </button>
+          <button
+            type="button"
+            className="muzak-btn muzak-mini-open"
+            onClick={() => setMinimizedPersist(false)}
+            title="expandir"
+            aria-label="expandir reproductor"
+          >
+            ▴
+          </button>
+        </div>
+      ) : (
+        <>
+      <div className="muzak-bar">
+        <button
+          type="button"
+          className="muzak-toggle"
+          onClick={() => setExpanded((x) => !x)}
+          title={expanded ? "ocultar lista" : "mostrar lista y volumen"}
+          aria-expanded={expanded}
+        >
+          {isHome ? "♪ LOBBY" : "♪ NODE"}
+          <span className="muzak-toggle-hint">
+            {expanded ? " · lista" : ""}
+          </span>
+        </button>
+        <button
+          type="button"
+          className="muzak-min-btn"
+          onClick={() => setMinimizedPersist(true)}
+          title="minimizar reproductor"
+          aria-label="minimizar reproductor"
+        >
+          —
+        </button>
+      </div>
 
       <div className="muzak-main">
         <div className="muzak-meta">
@@ -605,6 +670,14 @@ export default function AmbientMusicPlayer() {
           </button>
           <button type="button" className="muzak-btn" onClick={next} title="siguiente">
             ››
+          </button>
+          <button
+            type="button"
+            className="muzak-btn muzak-min-inline"
+            onClick={() => setMinimizedPersist(true)}
+            title="minimizar"
+          >
+            min
           </button>
         </div>
 
@@ -689,6 +762,8 @@ export default function AmbientMusicPlayer() {
           </div>
         ) : null}
       </div>
+        </>
+      )}
     </div>
   );
 }
