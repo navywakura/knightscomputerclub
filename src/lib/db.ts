@@ -156,7 +156,72 @@ export async function ensureSchema() {
       WHERE read_at IS NULL
   `;
 
-  // Seed / upsert categorías (incluye jerarquía offtopic)
+  // PIN de DMs (nexo) — 4 dígitos hasheados
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS dm_pin_hash TEXT
+  `;
+
+  // ── NEXO: tablones de usuario + chat casi real-time + DMs ──
+  await db`
+    CREATE TABLE IF NOT EXISTS nexo_boards (
+      id SERIAL PRIMARY KEY,
+      slug VARCHAR(64) UNIQUE NOT NULL,
+      name VARCHAR(128) NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      owner_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_nexo_boards_owner ON nexo_boards(owner_id)
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_nexo_boards_updated ON nexo_boards(updated_at DESC)
+  `;
+
+  await db`
+    CREATE TABLE IF NOT EXISTS nexo_messages (
+      id SERIAL PRIMARY KEY,
+      board_id INT NOT NULL REFERENCES nexo_boards(id) ON DELETE CASCADE,
+      author_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_nexo_messages_board
+      ON nexo_messages(board_id, id DESC)
+  `;
+
+  await db`
+    CREATE TABLE IF NOT EXISTS nexo_dm_threads (
+      id SERIAL PRIMARY KEY,
+      user_low INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_high INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      pin_hash TEXT NOT NULL,
+      created_by INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (user_low, user_high)
+    )
+  `;
+  await db`
+    CREATE TABLE IF NOT EXISTS nexo_dm_messages (
+      id SERIAL PRIMARY KEY,
+      thread_id INT NOT NULL REFERENCES nexo_dm_threads(id) ON DELETE CASCADE,
+      author_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_nexo_dm_messages_thread
+      ON nexo_dm_messages(thread_id, id DESC)
+  `;
+
+  // Seed / upsert categorías (incluye jerarquía offtopic + nexo)
   await seedCategories(db);
 
   // Owner del nodo: roger / rogynavarro@gmail.com
@@ -240,6 +305,14 @@ const CATEGORY_SEED: Array<{
     description: "Ciencia, investigación, divulgación y tech hard.",
     sort_order: 54,
     parent_slug: "offtopic",
+  },
+  {
+    slug: "nexo",
+    name: "// nexo",
+    description:
+      "Hub de tablones de usuario (crear board = VIP). Chat casi real-time + DMs con PIN.",
+    sort_order: 60,
+    parent_slug: null,
   },
 ];
 

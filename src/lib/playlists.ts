@@ -85,14 +85,16 @@ export const OPS_PLAYLIST: Playlist = {
   ],
 };
 
-/** true si la ruta usa la playlist de forum/donate */
+/** true si la ruta usa la playlist de forum/donate/nexo */
 export function isOpsPath(pathname: string): boolean {
   const p = pathname || "/";
   return (
     p === "/donate" ||
     p.startsWith("/donate/") ||
     p === "/forum" ||
-    p.startsWith("/forum/")
+    p.startsWith("/forum/") ||
+    p === "/nexo" ||
+    p.startsWith("/nexo/")
   );
 }
 

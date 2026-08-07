@@ -112,11 +112,22 @@ export default function Header() {
             if (user && (item.href === "/auth/login" || item.href === "/auth/register")) {
               continue;
             }
-            // /forum solo para usuarios registrados
-            if (!user && item.href === "/forum") continue;
+            // /forum y /nexo solo para usuarios registrados
+            if (!user && (item.href === "/forum" || item.href === "/nexo")) {
+              continue;
+            }
             items.push(item);
           }
-          if (user) items.push({ href: "/forum/new", label: "new_thread" });
+          if (user) {
+            // nexo después de forum si no está en NAV base
+            if (!items.some((i) => i.href === "/nexo")) {
+              const forumIdx = items.findIndex((i) => i.href === "/forum");
+              const nexoItem = { href: "/nexo", label: "nexo" };
+              if (forumIdx >= 0) items.splice(forumIdx + 1, 0, nexoItem);
+              else items.push(nexoItem);
+            }
+            items.push({ href: "/forum/new", label: "new_thread" });
+          }
           if (user && isOwnerUser(user)) {
             items.push({ href: "/admin", label: "admin" });
           }

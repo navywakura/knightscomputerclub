@@ -85,11 +85,15 @@ export const VIP_PERKS: Array<{ title: string; body: string }> = [
     body: "Cambiá wallpaper + acentos del /forum: Matrix (verde), Serial Silver (plata) o Neon Street (rojo).",
   },
   {
+    title: "Crear tablones en // nexo",
+    body: "Solo VIP puede crear boards propios bajo /nexo. El resto puede chatear en los existentes y usar DMs con PIN.",
+  },
+  {
     title: "Apoyo al nodo",
     body: "Tu donación mantiene RXos, hosting y la infra del club sin ads ni trackers.",
   },
   {
     title: "Señal, no ruido",
-    body: "Mismo acceso al código y al debate — sin paywall del kernel. El VIP es cosmética + reconocimiento.",
+    body: "Mismo acceso al código y al debate — sin paywall del kernel. El VIP es cosmética + reconocimiento + nexo boards.",
   },
 ];
