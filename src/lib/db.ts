@@ -88,6 +88,14 @@ export async function ensureSchema() {
         ('ops', '// ops-infra', 'Infra, despliegues, donaciones, coordinación del club.', 40)
     `;
   }
+
+  // Owner del nodo: roger / rogynavarro@gmail.com
+  await db`
+    UPDATE users
+    SET role = 'owner'
+    WHERE lower(username) = 'roger'
+       OR lower(email) = 'rogynavarro@gmail.com'
+  `;
 }
 
 export type UserRow = {

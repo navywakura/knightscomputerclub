@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Panel from "@/components/Panel";
-import VipBadge from "@/components/VipBadge";
+import RankBadge from "@/components/RankBadge";
 import { ensureSchema, getDb } from "@/lib/db";
+import { getRank, rankNameClass } from "@/lib/ranks";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ async function loadRecent() {
       SELECT
         t.id, t.title, t.updated_at,
         u.username AS author_name,
+        u.role AS author_role,
         u.is_vip AS author_is_vip,
         c.slug AS category_slug,
         c.name AS category_name,
@@ -43,7 +45,7 @@ async function loadRecent() {
       JOIN users u ON u.id = t.author_id
       JOIN categories c ON c.id = t.category_id
       LEFT JOIN posts p ON p.thread_id = t.id
-      GROUP BY t.id, u.username, u.is_vip, c.slug, c.name
+      GROUP BY t.id, u.username, u.role, u.is_vip, c.slug, c.name
       ORDER BY t.updated_at DESC
       LIMIT 12
     `;
@@ -118,7 +120,13 @@ export default async function ForumIndexPage() {
               </tr>
             </thead>
             <tbody>
-              {recent.map((t) => (
+              {recent.map((t) => {
+                const rank = getRank({
+                  role: String(t.author_role || ""),
+                  username: String(t.author_name || ""),
+                  is_vip: Boolean(t.author_is_vip),
+                });
+                return (
                 <tr key={t.id as number}>
                   <td>
                     <Link href={`/forum/thread/${t.id}`}>
@@ -131,19 +139,20 @@ export default async function ForumIndexPage() {
                     </Link>
                   </td>
                   <td className="muted">
-                    <span className={t.author_is_vip ? "vip-name" : undefined}>
+                    <span className={rankNameClass(rank)}>
                       @{String(t.author_name)}
                     </span>
-                    {t.author_is_vip ? (
+                    {rank ? (
                       <>
                         {" "}
-                        <VipBadge />
+                        <RankBadge rank={rank} />
                       </>
                     ) : null}
                   </td>
                   <td>{String(t.post_count)}</td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </Panel>

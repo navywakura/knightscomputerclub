@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import RankBadge from "@/components/RankBadge";
+import { getRank, rankNameClass } from "@/lib/ranks";
 
 type User = {
   id: number;
@@ -61,18 +63,22 @@ export default function Header() {
             user ? (
               <span className="user-chip">
                 <span className="online">●</span>{" "}
-                <span className={user.is_vip ? "vip-name" : undefined}>
+                <span
+                  className={rankNameClass(
+                    getRank({
+                      role: user.role,
+                      username: user.username,
+                      is_vip: user.is_vip,
+                    })
+                  )}
+                >
                   @{user.username}
                 </span>
-                {user.is_vip ? (
-                  <span
-                    className="vip-badge"
-                    data-text="[VIP]"
-                    title="Donante verificado del nodo"
-                  >
-                    [VIP]
-                  </span>
-                ) : null}
+                <RankBadge
+                  role={user.role}
+                  username={user.username}
+                  isVip={user.is_vip}
+                />
                 <button type="button" onClick={logout}>
                   [logout]
                 </button>

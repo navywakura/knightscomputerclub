@@ -109,6 +109,21 @@ async function main() {
     console.log("[kc] categorías ya existen, skip seed");
   }
 
+  const owners = await sql`
+    UPDATE users
+    SET role = 'owner'
+    WHERE lower(username) = 'roger'
+       OR lower(email) = 'rogynavarro@gmail.com'
+    RETURNING id, username, email, role
+  `;
+  if (owners.length) {
+    console.log("[kc] owner rank:", owners.map((o) => o.username).join(", "));
+  } else {
+    console.log(
+      "[kc] owner: sin usuario roger / rogynavarro@gmail.com aún (se asigna al registrarse o en ensureSchema)"
+    );
+  }
+
   console.log("[kc] schema listo.");
 }
 

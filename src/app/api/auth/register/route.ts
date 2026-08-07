@@ -49,9 +49,13 @@ export async function POST(req: Request) {
     }
 
     const password_hash = await hashPassword(password);
+    const role =
+      username === "roger" || email === "rogynavarro@gmail.com"
+        ? "owner"
+        : "member";
     const rows = await db`
-      INSERT INTO users (username, email, password_hash)
-      VALUES (${username}, ${email}, ${password_hash})
+      INSERT INTO users (username, email, password_hash, role)
+      VALUES (${username}, ${email}, ${password_hash}, ${role})
       RETURNING id, username, email, password_hash, role, is_vip, created_at
     `;
     const user = toPublicUser(rows[0] as UserRow);

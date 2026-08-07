@@ -1,18 +1,116 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Panel from "@/components/Panel";
 import ReplyForm from "@/components/ReplyForm";
-import VipBadge from "@/components/VipBadge";
+import RankBadge from "@/components/RankBadge";
 import { getSessionUser } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
+import {
+  getRank,
+  rankNameClass,
+  rankPostClass,
+  rankUserClass,
+} from "@/lib/ranks";
 
 export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ id: string }> };
 
-export async function generateMetadata({ params }: Props) {
+function excerpt(text: string, max = 180) {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  return t.slice(0, max - 1).trimEnd() + "…";
+}
+
+async function loadThreadMeta(threadId: number) {
+  try {
+    await ensureSchema();
+    const db = getDb();
+    const rows = await db`
+      SELECT
+        t.id, t.title, t.created_at, t.updated_at,
+        u.username AS author_name,
+        c.slug AS category_slug,
+        c.name AS category_name,
+        (
+          SELECT p.body FROM posts p
+          WHERE p.thread_id = t.id
+          ORDER BY p.created_at ASC
+          LIMIT 1
+        ) AS first_body
+      FROM threads t
+      JOIN users u ON u.id = t.author_id
+      JOIN categories c ON c.id = t.category_id
+      WHERE t.id = ${threadId}
+      LIMIT 1
+    `;
+    return (rows[0] as Record<string, unknown>) || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  return { title: `thread #${id} — knightscomputer.club` };
+  const threadId = Number(id);
+  if (!threadId) {
+    return { title: "thread — knightscomputer.club" };
+  }
+
+  const row = await loadThreadMeta(threadId);
+  if (!row) {
+    return {
+      title: `thread #${threadId} — knightscomputer.club`,
+      robots: { index: false, follow: true },
+    };
+  }
+
+  const title = String(row.title);
+  const author = String(row.author_name);
+  const board = String(row.category_name);
+  const body = row.first_body ? String(row.first_body) : "";
+  const description =
+    excerpt(body) ||
+    `Hilo en ${board} por @${author} · knightscomputer.club`;
+  const path = `/forum/thread/${threadId}`;
+  const ogTitle = `${title} · ${board}`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      title: ogTitle,
+      description,
+      type: "article",
+      url: path,
+      siteName: "knightscomputer.club",
+      locale: "es_ES",
+      publishedTime: row.created_at
+        ? new Date(String(row.created_at)).toISOString()
+        : undefined,
+      modifiedTime: row.updated_at
+        ? new Date(String(row.updated_at)).toISOString()
+        : undefined,
+      authors: [`@${author}`],
+      section: board,
+      images: [
+        {
+          url: `/forum/thread/${threadId}/opengraph-image`,
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: ogTitle,
+      description,
+      images: [`/forum/thread/${threadId}/opengraph-image`],
+    },
+  };
 }
 
 export default async function ThreadPage({ params }: Props) {
@@ -33,6 +131,7 @@ export default async function ThreadPage({ params }: Props) {
         t.id, t.category_id, t.author_id, t.title, t.locked, t.sticky,
         t.created_at, t.updated_at,
         u.username AS author_name,
+        u.role AS author_role,
         u.is_vip AS author_is_vip,
         c.slug AS category_slug,
         c.name AS category_name
@@ -70,6 +169,12 @@ export default async function ThreadPage({ params }: Props) {
 
   if (!thread) notFound();
 
+  const authorRank = getRank({
+    role: String(thread.author_role || ""),
+    username: String(thread.author_name || ""),
+    is_vip: Boolean(thread.author_is_vip),
+  });
+
   return (
     <>
       <div className="breadcrumbs">
@@ -84,13 +189,13 @@ export default async function ThreadPage({ params }: Props) {
         <h1>{String(thread.title)}</h1>
         <p className="muted">
           by{" "}
-          <span className={thread.author_is_vip ? "vip-name" : undefined}>
+          <span className={rankNameClass(authorRank)}>
             @{String(thread.author_name)}
           </span>
-          {thread.author_is_vip ? (
+          {authorRank ? (
             <>
               {" "}
-              <VipBadge />
+              <RankBadge rank={authorRank} />
             </>
           ) : null}{" "}
           · {new Date(String(thread.created_at)).toLocaleString()}
@@ -99,22 +204,28 @@ export default async function ThreadPage({ params }: Props) {
       </Panel>
 
       {posts.map((p, i) => {
-        const isVip = Boolean(p.author_is_vip);
+        const rank = getRank({
+          role: String(p.author_role || ""),
+          username: String(p.author_name || ""),
+          is_vip: Boolean(p.author_is_vip),
+        });
+        const userCls = rankUserClass(rank);
+        const postCls = rankPostClass(rank);
         return (
           <article
             key={p.id as number}
-            className={`post${isVip ? " post-vip" : ""}`}
+            className={`post${postCls ? ` ${postCls}` : ""}`}
           >
             <div className="post-meta">
               <span>
                 #{i + 1}{" "}
-                <span className={`user${isVip ? " vip-user" : ""}`}>
+                <span className={`user${userCls ? ` ${userCls}` : ""}`}>
                   @{String(p.author_name)}
                 </span>
-                {isVip ? (
+                {rank ? (
                   <>
                     {" "}
-                    <VipBadge />
+                    <RankBadge rank={rank} />
                   </>
                 ) : null}
               </span>

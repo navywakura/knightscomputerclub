@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Panel from "@/components/Panel";
-import VipBadge from "@/components/VipBadge";
+import RankBadge from "@/components/RankBadge";
 import { ensureSchema, getDb } from "@/lib/db";
+import { getRank, rankNameClass } from "@/lib/ranks";
 
 export const dynamic = "force-dynamic";
 
@@ -41,13 +42,14 @@ export default async function CategoryPage({ params }: Props) {
       SELECT
         t.id, t.title, t.locked, t.sticky, t.created_at, t.updated_at,
         u.username AS author_name,
+        u.role AS author_role,
         u.is_vip AS author_is_vip,
         COUNT(p.id)::int AS post_count
       FROM threads t
       JOIN users u ON u.id = t.author_id
       LEFT JOIN posts p ON p.thread_id = t.id
       WHERE t.category_id = ${category.id}
-      GROUP BY t.id, u.username, u.is_vip
+      GROUP BY t.id, u.username, u.role, u.is_vip
       ORDER BY t.sticky DESC, t.updated_at DESC
       LIMIT 80
     `) as Array<Record<string, unknown>>;
@@ -108,7 +110,13 @@ export default async function CategoryPage({ params }: Props) {
               </tr>
             </thead>
             <tbody>
-              {threads.map((t) => (
+              {threads.map((t) => {
+                const rank = getRank({
+                  role: String(t.author_role || ""),
+                  username: String(t.author_name || ""),
+                  is_vip: Boolean(t.author_is_vip),
+                });
+                return (
                 <tr key={t.id as number}>
                   <td>
                     {t.sticky ? (
@@ -126,13 +134,13 @@ export default async function CategoryPage({ params }: Props) {
                     </Link>
                   </td>
                   <td className="muted">
-                    <span className={t.author_is_vip ? "vip-name" : undefined}>
+                    <span className={rankNameClass(rank)}>
                       @{String(t.author_name)}
                     </span>
-                    {t.author_is_vip ? (
+                    {rank ? (
                       <>
                         {" "}
-                        <VipBadge />
+                        <RankBadge rank={rank} />
                       </>
                     ) : null}
                   </td>
@@ -141,7 +149,8 @@ export default async function CategoryPage({ params }: Props) {
                     {new Date(String(t.updated_at)).toLocaleString()}
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         )}

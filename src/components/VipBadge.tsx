@@ -1,4 +1,4 @@
-/** Rango [VIP] para donantes — efecto eléctrico oro */
+/** @deprecated Prefer RankBadge — kept for simple VIP-only spots */
 export default function VipBadge({ className = "" }: { className?: string }) {
   return (
     <span
