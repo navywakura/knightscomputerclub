@@ -16,6 +16,9 @@ import AppContextMenu, {
 import RankBadge from "@/components/RankBadge";
 import CaptchaField from "@/components/CaptchaField";
 import NexoChatBody from "@/components/nexo/NexoChatBody";
+import NexoEmojiPicker from "@/components/nexo/NexoEmojiPicker";
+import NexoFileAttach from "@/components/nexo/NexoFileAttach";
+import NexoGifPicker from "@/components/nexo/NexoGifPicker";
 import VipThemePicker from "@/components/VipThemePicker";
 import WiredBootScreen, { WIRED_BOOT_MIN_MS } from "@/components/WiredBootScreen";
 import { nexoInviteUrl } from "@/lib/auth-redirect";
@@ -1210,25 +1213,69 @@ export default function NexoApp({
                   className="nexo-compose"
                   onSubmit={tab === "boards" ? sendBoardMsg : sendDm}
                 >
-                  <input
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    placeholder={
-                      tab === "dm"
-                        ? "mensaje privado…"
-                        : "mensaje · @user para mencionar…"
-                    }
-                    maxLength={4000}
-                    disabled={sending}
-                    autoComplete="off"
-                  />
-                  <button
-                    className="btn"
-                    type="submit"
-                    disabled={sending || !text.trim()}
-                  >
-                    send
-                  </button>
+                  <div className="nexo-compose-tools">
+                    <NexoEmojiPicker
+                      disabled={sending}
+                      onPick={(em) =>
+                        setText((t) => `${t}${em}`)
+                      }
+                    />
+                    <NexoGifPicker
+                      disabled={sending}
+                      onPick={(g) =>
+                        setText(
+                          (t) =>
+                            `${t}${t && !t.endsWith("\n") ? "\n" : ""}![gif](${g.url})\n`
+                        )
+                      }
+                    />
+                    <NexoFileAttach
+                      accept="image"
+                      label="img"
+                      disabled={sending}
+                      onInsert={(md) => setText((t) => t + md)}
+                    />
+                    <NexoFileAttach
+                      accept="pdf"
+                      label="PDF"
+                      disabled={sending}
+                      onInsert={(md) => setText((t) => t + md)}
+                    />
+                    <span className="muted nexo-compose-hint">
+                      **bold** · *italic* · @user
+                    </span>
+                  </div>
+                  <div className="nexo-compose-row">
+                    <textarea
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      placeholder={
+                        tab === "dm"
+                          ? "mensaje privado… emoji · GIF · PDF"
+                          : "mensaje · emoji · GIF Tenor · PDF · @user"
+                      }
+                      maxLength={4000}
+                      disabled={sending}
+                      autoComplete="off"
+                      rows={2}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          if (text.trim() && !sending) {
+                            if (tab === "boards") void sendBoardMsg(e as unknown as FormEvent);
+                            else void sendDm(e as unknown as FormEvent);
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      className="btn"
+                      type="submit"
+                      disabled={sending || !text.trim()}
+                    >
+                      send
+                    </button>
+                  </div>
                 </form>
               )}
             </>

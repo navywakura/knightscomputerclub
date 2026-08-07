@@ -3520,6 +3520,238 @@ body.nexo-app-active footer {
 
 .nexo-compose {
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-deep, #020403) 85%, transparent);
+}
+
+.nexo-compose-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.nexo-compose-tool,
+.nexo-emoji-btn {
+  font-size: 0.75rem !important;
+  padding: 3px 8px !important;
+  min-width: auto;
+  line-height: 1.2;
+}
+
+.nexo-compose-hint {
+  font-size: 0.7rem;
+  margin-left: auto;
+}
+
+.nexo-compose-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.nexo-compose-row textarea {
+  flex: 1;
+  min-height: 2.4rem;
+  max-height: 8rem;
+  resize: vertical;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-deep, #020403);
+  color: var(--text);
+  border-radius: 2px;
+}
+
+.nexo-compose-row textarea:focus {
+  outline: 1px solid color-mix(in srgb, var(--green) 50%, transparent);
+}
+
+.nexo-emoji-wrap,
+.nexo-gif-wrap,
+.nexo-file-attach {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nexo-emoji-panel,
+.nexo-gif-panel {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: min(320px, 70vw);
+  max-height: 280px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  background: #0a100c;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  padding: 8px;
+}
+
+.nexo-gif-panel {
+  width: min(360px, 80vw);
+  max-height: 320px;
+}
+
+.nexo-emoji-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.nexo-emoji-tabs button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.nexo-emoji-tabs button.on {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.nexo-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  overflow: auto;
+  max-height: 200px;
+}
+
+.nexo-emoji-cell {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.nexo-emoji-cell:hover {
+  background: color-mix(in srgb, var(--green) 15%, transparent);
+}
+
+.nexo-gif-search {
+  width: 100%;
+  margin-bottom: 6px;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  background: #050807;
+  color: var(--text);
+}
+
+.nexo-gif-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  overflow: auto;
+  max-height: 220px;
+}
+
+.nexo-gif-cell {
+  background: #050807;
+  border: 1px solid var(--border);
+  padding: 0;
+  cursor: pointer;
+  aspect-ratio: 1;
+  overflow: hidden;
+}
+
+.nexo-gif-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.nexo-gif-cell:hover {
+  border-color: var(--amber);
+}
+
+.nexo-gif-status,
+.nexo-gif-err {
+  font-size: 0.8rem;
+  margin: 4px 0;
+}
+
+.nexo-gif-credit {
+  font-size: 0.65rem;
+  margin: 6px 0 0;
+  text-align: right;
+}
+
+.nexo-msg-img,
+.nexo-msg-gif {
+  display: block;
+  max-width: min(320px, 100%);
+  max-height: 240px;
+  border-radius: 6px;
+  margin: 6px 0;
+  border: 1px solid var(--border);
+  object-fit: contain;
+  background: #050807;
+}
+
+.nexo-msg-gif {
+  max-height: 200px;
+}
+
+.nexo-pdf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  border: 1px dashed var(--amber);
+  color: var(--amber);
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  margin: 4px 0;
+}
+
+.nexo-pdf-link:hover {
+  background: color-mix(in srgb, var(--amber) 22%, transparent);
+}
+
+.nexo-md-code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.85em;
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+  padding: 0 4px;
+  border-radius: 2px;
+}
+
+.nexo-md-bold {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.nexo-md-em {
+  font-style: italic;
+  color: var(--text);
+}
+
+.nexo-compose-legacy {
+  display: flex;
   gap: 8px;
   padding: 10px 12px;
   border-top: 1px solid var(--border);
