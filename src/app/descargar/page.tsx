@@ -7,19 +7,19 @@ import { DOWNLOAD_PLATFORMS } from "@/lib/downloads";
 export const metadata: Metadata = {
   title: "descargar",
   description:
-    "Descargá KCC Nexo: Windows Electron listo. macOS, Linux, CLI, Android e iOS en camino.",
+    "Descargá KCC Nexo: Windows, macOS y Linux (CLI). Android e iOS en camino.",
   alternates: { canonical: "/descargar" },
   openGraph: {
     title: "Descargar · knightscomputer.club",
     description:
-      "Clientes del nodo: escritorio, móvil y CLI. Windows disponible ahora.",
+      "Clientes del nodo: escritorio (Win/macOS), Linux CLI y más.",
     url: "/descargar",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Descargar · knightscomputer.club",
-    description: "KCC Nexo para Windows y más plataformas.",
+    description: "KCC Nexo para Windows, macOS, Linux CLI y más.",
   },
 };
 
@@ -32,7 +32,9 @@ export default function DescargarPage() {
           Elegí la plataforma. La app de escritorio{" "}
           <strong>KCC Nexo</strong> conecta a{" "}
           <Link href="/nexo">// nexo</Link> en el sitio (UI siempre
-          actualizada). Otras plataformas: próximamente.
+          actualizada). En Linux usá la{" "}
+          <strong>CLI</strong> del monorepo (
+          <code className="inline">curl … | bash</code>).
         </p>
         <p className="muted">
           También podés usar nexo en el navegador sin instalar nada →{" "}
@@ -111,6 +113,27 @@ export default function DescargarPage() {
           <li>
             <strong>Windows</strong>: instalador NSIS o portable. Requiere
             Windows 10+ x64.
+          </li>
+          <li>
+            <strong>macOS</strong>: DMG Apple Silicon / Intel. Sin Developer ID:
+            clic derecho → Abrir o{" "}
+            <code className="inline">scripts/fix-macos-kcc-nexo.sh</code>.
+          </li>
+          <li>
+            <strong>Linux</strong>: CLI lista. Guía en monorepo{" "}
+            <a
+              href="https://github.com/navywakura/knightscomputerclub/blob/main/packages/kcc-cli/README.md"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              packages/kcc-cli
+            </a>
+            . Install:{" "}
+            <code className="inline">
+              curl -fsSL
+              https://raw.githubusercontent.com/navywakura/knightscomputerclub/main/scripts/install-kcc-cli.sh
+              | bash
+            </code>
           </li>
           <li>
             Auto-update del shell vía GitHub Releases; la UI web se refresca

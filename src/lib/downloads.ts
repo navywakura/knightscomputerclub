@@ -99,10 +99,24 @@ export const DOWNLOAD_PLATFORMS: DownloadPlatform[] = [
   {
     id: "linux",
     name: "Linux",
-    subtitle: "KCC Nexo · AppImage / deb",
-    status: "soon",
+    subtitle: "KCC CLI · terminal (// nexo)",
+    status: "ready",
     logo: "linux",
-    notes: "Build Linux planeado. Usá https://www.knightscomputer.club/nexo",
+    version: CLI_VER,
+    cta: "Install script (.sh)",
+    href: `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/scripts/install-kcc-cli.sh`,
+    alt: [
+      {
+        label: "Guía en monorepo",
+        href: `https://github.com/${GH_OWNER}/${GH_REPO}/blob/main/packages/kcc-cli/README.md`,
+      },
+      {
+        label: "Package .tgz",
+        href: CLI_TGZ,
+      },
+      { label: "Releases", href: GH_LATEST },
+    ],
+    notes: `Listo. Guía en el monorepo → packages/kcc-cli/README.md. Un comando: curl -fsSL https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/scripts/install-kcc-cli.sh | bash · Después: kcc-cli (Node ≥18). Shell Electron AppImage/deb: roadmap.`,
   },
   {
     id: "cli",
