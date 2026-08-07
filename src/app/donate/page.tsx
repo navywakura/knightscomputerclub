@@ -20,11 +20,6 @@ export default function DonatePage() {
           aportar — fiat o crypto — mantenés vivo el desarrollo de{" "}
           <strong>RXos</strong> y la infraestructura del club.
         </p>
-        <p className="muted">
-          Los enlaces y direcciones de abajo son{" "}
-          <span className="tag hot">PLACEHOLDERS</span> — reemplazalos en{" "}
-          <code>.env.local</code> / variables de Vercel antes de producción.
-        </p>
         <p>
           Donantes verificados reciben el rango{" "}
           <span className="vip-badge" data-text="[VIP]">
@@ -60,7 +55,7 @@ export default function DonatePage() {
               </a>
             ) : (
               <>
-                <div className="address-box" title="dirección (placeholder)">
+                <div className="address-box" title="dirección">
                   {ch.value}
                 </div>
                 <CopyButton text={ch.value} />

@@ -65,9 +65,8 @@ export default function HomePage() {
           <span className="tag ok">01</span>
           <h3>// donar</h3>
           <p className="muted">
-            PayPal, Ko-fi, BTC, SOL, USDT. Placeholders hasta que el tesoro
-            esté listo. Cada satoshi va a toolchain, hardware de prueba y
-            café del kernel.
+            PayPal, Ko-fi, BTC, SOL, USDT. Cada satoshi va a toolchain,
+            hardware de prueba y café del kernel.
           </p>
           <Link href="/donate">abrir canal de donación →</Link>
         </div>
