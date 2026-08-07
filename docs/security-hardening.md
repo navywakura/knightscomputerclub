@@ -11,7 +11,7 @@ parametrizadas (`neon` tagged templates = prepared statements).
 | XSS | React escape + `rehype-sanitize` en markdown foro |
 | Cookies | `HttpOnly` + `Secure` (prod) + `SameSite=Lax` (OAuth) |
 | Tampering roles | `role`/`is_vip` solo desde sesión server-side |
-| Schema abuse | Zod en login (+ expandible a más rutas) |
+| Schema abuse | Zod estricto en login, register, posts, threads, nexo, dm, media, profile, friends, reports, paste |
 | Rate limit | Middleware edge + buckets en memoria |
 | Stack traces | `publicError()` en prod |
 | Headers | CSP, HSTS, X-Frame-Options DENY, nosniff |
@@ -82,10 +82,11 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO kcc_app;
 - [x] Headers de seguridad
 - [x] Rate limiting
 - [x] Roles solo server-side
-- [ ] CSP sin unsafe-eval (requiere audit de Next chunks)
+- [x] CSP sin unsafe-eval (script-src 'self' 'unsafe-inline')
 - [ ] SameSite=Strict con OAuth propio
 - [ ] WAF / pf en VPS
 - [ ] Tor mirror
+- [x] Pastebin ZK (`/paste`, key en #fragment)
 
 ## Sprints de producto relacionados
 
@@ -94,4 +95,5 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO kcc_app;
 | 1 | Security headers, rate limit, Zod login, safe errors | done |
 | 2 | RSS `/api/rss/[slug]`, comandos `/me` `/theme`, UI SFX | done |
 | 3 | Docs OpenBSD, health, esta guía | done |
-| 4 | Pastebin ZK, SSH TUI, onion | backlog |
+| 4 | Zod all routes + CSP no-eval + Pastebin ZK | done |
+| 5 | SSH TUI, onion | backlog |

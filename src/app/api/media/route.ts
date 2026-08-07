@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
 import { moderateImageBuffer } from "@/lib/nsfw";
+import { mediaJsonSchema, parseJsonBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -63,13 +64,24 @@ export async function POST(req: Request) {
       }
       buf = Buffer.from(await file.arrayBuffer());
     } else {
-      const body = await req.json();
+      const rawJson = await req.json().catch(() => null);
+      const parsed = parseJsonBody(mediaJsonSchema, rawJson ?? {});
+      if (!parsed.ok) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      const body = parsed.data;
       const b64 = String(body.data || body.base64 || "");
       mime = String(body.mime || body.type || "image/jpeg");
       filename = String(body.filename || body.name || "").slice(0, 180);
       if (!IMAGE_TYPES.has(mime) && mime !== PDF_TYPE) {
         return NextResponse.json(
           { error: "solo jpeg/png/webp/gif o PDF" },
+          { status: 400 }
+        );
+      }
+      if (!b64) {
+        return NextResponse.json(
+          { error: "data/base64 requerido" },
           { status: 400 }
         );
       }

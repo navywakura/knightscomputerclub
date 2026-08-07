@@ -9,6 +9,11 @@ import {
 } from "@/lib/nexo";
 import { safeNotifyMany } from "@/lib/notify";
 import { isOwnerUser } from "@/lib/ranks";
+import {
+  nexoMessagePatchSchema,
+  nexoMessagePostSchema,
+  readJsonBody,
+} from "@/lib/validate";
 
 function mapMsg(r: Record<string, unknown>) {
   const deleted = Boolean(r.deleted);
@@ -164,7 +169,11 @@ export async function POST(req: Request) {
     if (me.banned) {
       return NextResponse.json({ error: "baneado" }, { status: 403 });
     }
-    const body = await req.json().catch(() => ({}));
+    const parsed = await readJsonBody(req, nexoMessagePostSchema);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const body = parsed.data;
     const boardId = Number(body.board_id || body.board);
     const text = String(body.body || body.content || "").trim();
     const replyTo = body.reply_to_id ? Number(body.reply_to_id) : null;
@@ -281,7 +290,11 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "baneado" }, { status: 403 });
     }
 
-    const body = await req.json().catch(() => ({}));
+    const parsed = await readJsonBody(req, nexoMessagePatchSchema);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const body = parsed.data;
     const id = Number(body.id || body.message_id);
     const action = String(body.action || "edit");
     if (!id) {

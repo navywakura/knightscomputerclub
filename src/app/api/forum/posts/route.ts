@@ -5,6 +5,13 @@ import { ensureSchema, getDb } from "@/lib/db";
 import { previewsForPosts, type LinkPreview } from "@/lib/link-preview";
 import { safeNotifyMany } from "@/lib/notify";
 import { isOwnerUser } from "@/lib/ranks";
+import { logServerError, publicError } from "@/lib/safe-error";
+import {
+  forumPostDeleteSchema,
+  forumPostSchema,
+  parseJsonBody,
+  readJsonBody,
+} from "@/lib/validate";
 
 export async function GET(req: Request) {
   try {
@@ -110,7 +117,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "baneado" }, { status: 403 });
     }
 
-    const body = await req.json();
+    const parsed = await readJsonBody(req, forumPostSchema);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const body = parsed.data;
     const threadId = Number(body.thread_id || body.thread);
     const content = String(body.body || body.content || "").trim();
 
@@ -234,12 +245,21 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "login requerido" }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => ({}));
+    const raw = await req.json().catch(() => ({}));
     const { searchParams } = new URL(req.url);
-    const postId = Number(body.id || body.post_id || searchParams.get("id"));
-    if (!postId) {
-      return NextResponse.json({ error: "id de post requerido" }, { status: 400 });
+    const merged = {
+      id: Number(
+        (raw as { id?: number }).id ||
+          (raw as { post_id?: number }).post_id ||
+          searchParams.get("id") ||
+          0
+      ),
+    };
+    const parsed = parseJsonBody(forumPostDeleteSchema, merged);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
+    const postId = parsed.data.id;
 
     await ensureSchema();
     const db = getDb();

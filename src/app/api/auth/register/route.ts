@@ -10,10 +10,15 @@ import {
 } from "@/lib/auth";
 import { ensureSchema, getDb, type UserRow } from "@/lib/db";
 import { issueEmailOtp } from "@/lib/otp";
+import { readJsonBody, registerSchema } from "@/lib/validate";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const parsed = await readJsonBody(req, registerSchema);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const body = parsed.data;
     const username = sanitizeUsername(String(body.username || ""));
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");

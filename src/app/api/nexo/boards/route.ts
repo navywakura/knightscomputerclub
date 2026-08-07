@@ -7,6 +7,7 @@ import {
   NEXO_BOARD_NAME_MAX,
   slugifyBoardName,
 } from "@/lib/nexo";
+import { nexoBoardPostSchema, readJsonBody } from "@/lib/validate";
 
 export async function GET() {
   try {
@@ -62,7 +63,11 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = await req.json().catch(() => ({}));
+    const parsed = await readJsonBody(req, nexoBoardPostSchema);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const body = parsed.data;
     const captcha = verifyCaptcha(body.captcha_token, body.captcha_answer);
     if (!captcha.ok) {
       return NextResponse.json(

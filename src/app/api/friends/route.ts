@@ -3,6 +3,7 @@ import { getSessionUser, requireVerified } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
 import { friendshipBetween } from "@/lib/friends";
 import { safeNotify } from "@/lib/notify";
+import { friendsPostSchema, readJsonBody } from "@/lib/validate";
 
 /** Lista amigos + solicitudes entrantes/salientes */
 export async function GET() {
@@ -90,7 +91,11 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    const body = await req.json().catch(() => ({}));
+    const parsed = await readJsonBody(req, friendsPostSchema);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const body = parsed.data;
     const action = String(body.action || "request");
 
     // solicitar amistad requiere email verificado; accept/reject/remove no

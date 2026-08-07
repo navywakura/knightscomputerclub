@@ -3,6 +3,7 @@ import { getSessionUser, requireVerified } from "@/lib/auth";
 import { verifyCaptcha } from "@/lib/captcha";
 import { ensureSchema, getDb } from "@/lib/db";
 import { isOwnerUser } from "@/lib/ranks";
+import { forumThreadSchema, readJsonBody } from "@/lib/validate";
 
 export async function GET(req: Request) {
   try {
@@ -107,7 +108,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "baneado" }, { status: 403 });
     }
 
-    const body = await req.json();
+    const parsed = await readJsonBody(req, forumThreadSchema);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const body = parsed.data;
     const categorySlug = String(body.category || body.category_slug || "").trim();
     const title = String(body.title || "").trim().slice(0, 200);
     const content = String(body.body || body.content || "").trim();

@@ -3,6 +3,11 @@ import { getSessionUser, requireVerified } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
 import { isOwnerUser } from "@/lib/ranks";
 import { safeNotify } from "@/lib/notify";
+import {
+  readJsonBody,
+  reportPatchSchema,
+  reportSchema,
+} from "@/lib/validate";
 
 const TYPES = new Set([
   "forum_post",
@@ -37,7 +42,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "baneado" }, { status: 403 });
     }
 
-    const body = await req.json().catch(() => ({}));
+    const parsed = await readJsonBody(req, reportSchema);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const body = parsed.data;
     const target_type = String(body.target_type || body.type || "");
     const target_id = Number(body.target_id || body.id || 0);
     const reason = String(body.reason || "other").toLowerCase();
@@ -144,15 +153,12 @@ export async function PATCH(req: Request) {
     if (!user || !isOwnerUser(user)) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
-    const body = await req.json().catch(() => ({}));
-    const id = Number(body.id);
-    const status = String(body.status || "");
-    if (!id || !["open", "reviewed", "dismissed"].includes(status)) {
-      return NextResponse.json(
-        { error: "id y status (open|reviewed|dismissed) requeridos" },
-        { status: 400 }
-      );
+    const parsed = await readJsonBody(req, reportPatchSchema);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
+    const id = parsed.data.id;
+    const status = parsed.data.status;
     await ensureSchema();
     const db = getDb();
     const rows = await db`

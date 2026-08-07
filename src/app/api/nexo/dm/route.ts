@@ -11,6 +11,7 @@ import {
   verifyPin,
 } from "@/lib/nexo";
 import { safeNotify } from "@/lib/notify";
+import { nexoDmPostSchema, readJsonBody } from "@/lib/validate";
 
 /** Lista DMs del usuario + abrir/crear con PIN */
 export async function GET(req: Request) {
@@ -172,7 +173,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "baneado" }, { status: 403 });
     }
     const me = user!;
-    const body = await req.json().catch(() => ({}));
+    const parsed = await readJsonBody(req, nexoDmPostSchema);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const body = parsed.data;
     const action = String(body.action || "open");
 
     await ensureSchema();

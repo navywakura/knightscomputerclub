@@ -5,6 +5,11 @@ import {
   toPublicUser,
 } from "@/lib/auth";
 import { ensureSchema, getDb, type UserRow } from "@/lib/db";
+import {
+  profileDeleteSchema,
+  profilePatchSchema,
+  readJsonBody,
+} from "@/lib/validate";
 
 export async function GET() {
   try {
@@ -40,7 +45,11 @@ export async function PATCH(req: Request) {
       );
     }
 
-    const body = await req.json().catch(() => ({}));
+    const parsed = await readJsonBody(req, profilePatchSchema);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const body = parsed.data as Record<string, unknown>;
     await ensureSchema();
     const db = getDb();
 
@@ -276,8 +285,11 @@ export async function DELETE(req: Request) {
     if (!user) {
       return NextResponse.json({ error: "login requerido" }, { status: 401 });
     }
-    const body = await req.json().catch(() => ({}));
-    const confirm = String(body.confirm || "");
+    const parsed = await readJsonBody(req, profileDeleteSchema);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const confirm = String(parsed.data.confirm || "");
     if (confirm !== user.username && confirm !== "DELETE") {
       return NextResponse.json(
         {

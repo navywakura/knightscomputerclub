@@ -413,8 +413,33 @@ export async function ensureSchema() {
       ON reports (target_type, target_id)
   `;
 
+  // Pastebin ZK — solo ciphertext; la key nunca llega al server
+  await db`
+    CREATE TABLE IF NOT EXISTS pastes (
+      id VARCHAR(32) PRIMARY KEY,
+      ciphertext TEXT NOT NULL,
+      iv VARCHAR(128) NOT NULL,
+      algo VARCHAR(32) NOT NULL DEFAULT 'AES-GCM',
+      burn_after_read BOOLEAN NOT NULL DEFAULT FALSE,
+      views INT NOT NULL DEFAULT 0,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_pastes_expires
+      ON pastes (expires_at)
+  `;
+
   // Seed / upsert categorías (incluye jerarquía offtopic + nexo)
   await seedCategories(db);
+
+  // purga pastes vencidos
+  try {
+    await db`DELETE FROM pastes WHERE expires_at < NOW()`;
+  } catch {
+    /* */
+  }
 
   // Purga mensajes DM efímeros vencidos
   try {

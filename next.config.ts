@@ -1,15 +1,20 @@
 import type { NextConfig } from "next";
 import path from "path";
 
-/** CSP: self + Giphy + Google fonts + media. Ajustar en OpenBSD si se añade Tor. */
+/**
+ * CSP endurecida: sin unsafe-eval.
+ * unsafe-inline se mantiene en script/style por bundles Next + CSS-in-JS ligero.
+ * Si un build rompe, revisar Report-Only antes de reintroducir eval.
+ */
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Next hydration; endurecer en mirror si se pre-renderiza más
+  "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https:",
   "media-src 'self' blob:",
   "connect-src 'self' https://api.giphy.com https://*.giphy.com",
+  "worker-src 'self' blob:",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

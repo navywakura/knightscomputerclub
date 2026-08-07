@@ -4603,3 +4603,43 @@ body.nexo-app-active footer {
     height: 36px;
   }
 }
+
+/* paste ZK */
+.paste-app {
+  max-width: 720px;
+}
+.paste-form textarea {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  min-height: 200px;
+}
+.paste-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin: 10px 0 14px;
+}
+.paste-opts select {
+  margin-left: 8px;
+}
+.paste-plain {
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-deep, #020403);
+  font-size: 0.85rem;
+  max-height: 60vh;
+  overflow: auto;
+}
+.paste-share {
+  margin-bottom: 14px;
+}
+.paste-share-input {
+  width: 100%;
+  margin: 8px 0;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
