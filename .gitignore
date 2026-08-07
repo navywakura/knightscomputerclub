@@ -50,3 +50,8 @@ ko_fi*.webp
 451077-github.png
 icons8-*.png
 fondo_*.jpg
+
+# Electron desktop (local only — no commit / no push)
+/electron/
+electron/dist/
+electron/node_modules/

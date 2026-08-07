@@ -807,6 +807,10 @@ export default function NexoApp({
                       username: m.author_name,
                       is_vip: m.author_is_vip,
                     });
+                    const isMine = !!(me && m.author_id === me.id);
+                    const initials = (m.author_name || "?")
+                      .replace(/^@/, "")
+                      .slice(0, 2);
                     return (
                       <AppContextMenu
                         key={m.id}
@@ -823,25 +827,25 @@ export default function NexoApp({
                         }}
                       >
                         <article
-                          className={`nexo-msg${
-                            me && m.author_id === me.id ? " mine" : ""
-                          }`}
+                          className={`nexo-msg${isMine ? " mine" : ""}`}
                         >
-                          <header className="nexo-msg-meta">
-                            <span className={rankNameClass(rank)}>
-                              @{m.author_name}
-                            </span>
-                            {rank ? (
-                              <>
-                                {" "}
-                                <RankBadge rank={rank} />
-                              </>
-                            ) : null}
-                            <span className="muted">
-                              {new Date(m.created_at).toLocaleString()}
-                            </span>
-                          </header>
-                          <div className="nexo-msg-body">{m.body}</div>
+                          <div className="nexo-msg-avatar" aria-hidden>
+                            {initials}
+                          </div>
+                          <div className="nexo-msg-content">
+                            <header className="nexo-msg-meta">
+                              <span
+                                className={`nexo-msg-user ${rankNameClass(rank) || ""}`.trim()}
+                              >
+                                @{m.author_name}
+                              </span>
+                              {rank ? <RankBadge rank={rank} /> : null}
+                              <span className="nexo-msg-time">
+                                {new Date(m.created_at).toLocaleString()}
+                              </span>
+                            </header>
+                            <div className="nexo-msg-body">{m.body}</div>
+                          </div>
                         </article>
                       </AppContextMenu>
                     );
