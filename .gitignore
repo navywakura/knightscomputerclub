@@ -55,3 +55,4 @@ fondo_*.jpg
 /electron/
 electron/dist/
 electron/node_modules/
+tree.ml
