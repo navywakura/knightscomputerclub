@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import "./globals.css";
+import "../../packages/web-notify/src/react/styles.css";
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL || "https://knightscomputer.club";

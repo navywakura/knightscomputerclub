@@ -1581,3 +1581,46 @@ textarea {
   text-decoration: none;
   opacity: 1;
 }
+
+/* web-notify kit themed for this site */
+.user-chip .wn-notify {
+  margin-left: 6px;
+}
+
+.wn-bell {
+  border-color: var(--border) !important;
+  color: var(--cyan) !important;
+  font-family: var(--font-ui) !important;
+}
+
+.wn-bell:hover {
+  border-color: var(--border-bright) !important;
+  color: var(--green) !important;
+}
+
+.wn-panel {
+  border-color: var(--border) !important;
+  background: #060c08 !important;
+  color: var(--text) !important;
+  box-shadow: 0 0 24px rgba(0, 255, 65, 0.12) !important;
+}
+
+.wn-panel-head {
+  border-bottom-color: #1a3a22 !important;
+  color: var(--green) !important;
+  font-family: var(--font-ui);
+}
+
+.wn-item.unread {
+  border-left-color: var(--green) !important;
+  background: rgba(0, 255, 65, 0.06) !important;
+}
+
+.wn-item-title {
+  color: var(--green) !important;
+}
+
+.wn-badge {
+  background: var(--amber) !important;
+  color: #1a1000 !important;
+}

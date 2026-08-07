@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import RankBadge from "@/components/RankBadge";
+import { NotificationCenter } from "@web-notify/react";
 import { getRank, isOwnerUser, rankNameClass } from "@/lib/ranks";
 
 type User = {
@@ -78,6 +79,15 @@ export default function Header() {
                   role={user.role}
                   username={user.username}
                   isVip={user.is_vip}
+                />
+                <NotificationCenter
+                  enabled
+                  apiBase="/api/notifications"
+                  pollMs={40000}
+                  onNavigate={(href) => {
+                    router.push(href);
+                    router.refresh();
+                  }}
                 />
                 <button type="button" onClick={logout}>
                   [logout]

@@ -1,0 +1,155 @@
+/* Estilos base del kit — copiá o importá en tu global CSS.
+   Prefijo .wn-* para no chocar con tu app. */
+
+.wn-notify {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.wn-bell {
+  position: relative;
+  font-family: inherit;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.wn-bell:hover {
+  opacity: 1;
+}
+
+.wn-bell-icon {
+  font-style: normal;
+}
+
+.wn-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 0.65rem;
+  line-height: 16px;
+  text-align: center;
+  background: #ff4466;
+  color: #fff;
+  font-weight: 700;
+}
+
+.wn-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 80;
+  width: min(360px, 92vw);
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #0a0f0c;
+  color: #c8dcc8;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+}
+
+.wn-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.85rem;
+}
+
+.wn-linkish {
+  font: inherit;
+  font-size: 0.75rem;
+  background: none;
+  border: none;
+  color: #6ad;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.wn-linkish:disabled {
+  opacity: 0.4;
+  cursor: default;
+  text-decoration: none;
+}
+
+.wn-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.wn-empty {
+  padding: 16px;
+  text-align: center;
+  opacity: 0.6;
+  font-size: 0.85rem;
+}
+
+.wn-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.wn-item:hover {
+  background: rgba(0, 255, 100, 0.06);
+}
+
+.wn-item.unread {
+  background: rgba(0, 255, 100, 0.08);
+  border-left: 2px solid #33ff66;
+}
+
+.wn-item-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #7cff9a;
+  margin-bottom: 2px;
+}
+
+.wn-item-body {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wn-item-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 0.7rem;
+  opacity: 0.55;
+}
+
+.wn-type {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureSchema, getDb } from "@/lib/db";
 import { sanitizeUsername } from "@/lib/auth";
+import { safeNotify } from "@/lib/notify";
 
 /**
  * Marca / desmarca VIP (donante) en el foro.
@@ -46,6 +47,18 @@ export async function POST(req: Request) {
         { error: "usuario no encontrado" },
         { status: 404 }
       );
+    }
+
+    if (isVip) {
+      await safeNotify({
+        userId: Number(rows[0].id),
+        type: "rank.vip",
+        title: "rango [VIP] activado",
+        body: "Gracias por apoyar el nodo. Tu handle brilla en oro.",
+        href: "/forum",
+        actorLabel: "system",
+        payload: { is_vip: true },
+      });
     }
 
     return NextResponse.json({

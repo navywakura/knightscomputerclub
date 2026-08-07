@@ -3,6 +3,7 @@ import { getOwnerSession } from "@/lib/admin";
 import { ensureSchema, getDb } from "@/lib/db";
 import { isOwnerUser } from "@/lib/ranks";
 import { sanitizeUsername } from "@/lib/auth";
+import { safeNotify } from "@/lib/notify";
 
 /** Lista usuarios (solo owner logueado) */
 export async function GET() {
@@ -144,6 +145,53 @@ export async function POST(req: Request) {
     }
 
     const u = rows[0];
+
+    if (action === "vip") {
+      await safeNotify({
+        userId: Number(u.id),
+        type: "rank.vip",
+        title: "rango [VIP] activado",
+        body: "Gracias por apoyar el nodo. Tu handle brilla en oro.",
+        href: "/forum",
+        actorId: owner.id,
+        actorLabel: owner.username,
+        payload: { is_vip: true },
+      });
+    } else if (action === "unvip") {
+      await safeNotify({
+        userId: Number(u.id),
+        type: "rank.vip",
+        title: "rango [VIP] removido",
+        body: "Tu badge VIP fue desactivado por moderación.",
+        href: "/forum",
+        actorId: owner.id,
+        actorLabel: owner.username,
+        payload: { is_vip: false },
+      });
+    } else if (action === "ban") {
+      await safeNotify({
+        userId: Number(u.id),
+        type: "mod.ban",
+        title: "cuenta restringida",
+        body: "Tu cuenta fue baneada. Contactá ops del nodo si creés que es un error.",
+        href: "/",
+        actorId: owner.id,
+        actorLabel: owner.username,
+        payload: { banned: true },
+      });
+    } else if (action === "unban") {
+      await safeNotify({
+        userId: Number(u.id),
+        type: "mod.ban",
+        title: "cuenta restaurada",
+        body: "El ban fue levantado. Bienvenido de nuevo al nodo.",
+        href: "/forum",
+        actorId: owner.id,
+        actorLabel: owner.username,
+        payload: { banned: false },
+      });
+    }
+
     return NextResponse.json({
       ok: true,
       action,

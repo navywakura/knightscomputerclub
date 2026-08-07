@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
+import { safeNotifyMany } from "@/lib/notify";
 import { isOwnerUser } from "@/lib/ranks";
 
 export async function GET(req: Request) {
@@ -74,7 +75,7 @@ export async function POST(req: Request) {
     const db = getDb();
 
     const threads = await db`
-      SELECT id, locked FROM threads WHERE id = ${threadId} LIMIT 1
+      SELECT id, locked, author_id, title FROM threads WHERE id = ${threadId} LIMIT 1
     `;
     if (!threads[0]) {
       return NextResponse.json({ error: "hilo no encontrado" }, { status: 404 });
@@ -92,6 +93,32 @@ export async function POST(req: Request) {
     await db`
       UPDATE threads SET updated_at = NOW() WHERE id = ${threadId}
     `;
+
+    // Notificar autor del hilo + participantes (excepto quien escribió)
+    const participants = await db`
+      SELECT DISTINCT author_id FROM posts WHERE thread_id = ${threadId}
+    `;
+    const recipientIds = new Set<number>();
+    recipientIds.add(Number(threads[0].author_id));
+    for (const row of participants) {
+      recipientIds.add(Number(row.author_id));
+    }
+    recipientIds.delete(user.id);
+
+    const postId = Number(posts[0].id);
+    const title = String(threads[0].title || `thread #${threadId}`);
+    const excerpt =
+      content.length > 120 ? content.slice(0, 119).trimEnd() + "…" : content;
+
+    await safeNotifyMany([...recipientIds], {
+      type: "forum.reply",
+      title: `respuesta en: ${title.slice(0, 80)}`,
+      body: `@${user.username}: ${excerpt}`,
+      href: `/forum/post/${postId}`,
+      actorId: user.id,
+      actorLabel: user.username,
+      payload: { threadId, postId },
+    });
 
     return NextResponse.json(
       {
