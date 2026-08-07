@@ -38,3 +38,10 @@ next-env.d.ts
 # source assets (convertidos a public/)
 /pexels-photo-*.avif
 *.avif
+
+# leftover icon dumps
+/*-usdt.png
+/*-paypal.png
+/*-bitcoin.png
+/*-solana.png
+ko_fi*.webp
