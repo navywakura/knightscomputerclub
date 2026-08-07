@@ -1,22 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import Panel from "@/components/Panel";
-import PostBody from "@/components/PostBody";
-import RankBadge from "@/components/RankBadge";
-import ShareButton from "@/components/ShareButton";
-import { DeletePostButton } from "@/components/ModControls";
-import { getSessionUser } from "@/lib/auth";
+import ForumApp from "@/components/forum/ForumApp";
 import { ensureSchema, getDb } from "@/lib/db";
 import { excerptBody, firstImageUrl, plainTextFromBody } from "@/lib/markdown";
-import { previewsForBody } from "@/lib/link-preview";
-import {
-  getRank,
-  isOwnerUser,
-  rankNameClass,
-  rankPostClass,
-  rankUserClass,
-} from "@/lib/ranks";
 
 export const dynamic = "force-dynamic";
 
@@ -96,9 +82,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           height: 630,
           alt: plainTextFromBody(body).slice(0, 80) || threadTitle,
         },
-        ...(img
-          ? [{ url: img, alt: "adjunto del post" }]
-          : []),
+        ...(img ? [{ url: img, alt: "adjunto del post" }] : []),
       ],
     },
     twitter: {
@@ -118,103 +102,6 @@ export default async function PostPage({ params }: Props) {
   const post = await loadPost(postId);
   if (!post) notFound();
 
-  const user = await getSessionUser().catch(() => null);
-  const rank = getRank({
-    role: String(post.author_role || ""),
-    username: String(post.author_name || ""),
-    is_vip: Boolean(post.author_is_vip),
-  });
-  const canDelete =
-    user &&
-    (isOwnerUser(user) || Number(post.author_id) === user.id);
-  const path = `/forum/post/${postId}`;
   const threadId = Number(post.thread_id);
-  const body = String(post.body || "");
-  const previews = await previewsForBody(body).catch(() => []);
-
-  // ¿Es el OP del hilo? → markdown; si es reply, plain (como en el thread)
-  let isOp = true;
-  try {
-    await ensureSchema();
-    const db = getDb();
-    const first = await db`
-      SELECT id FROM posts
-      WHERE thread_id = ${threadId}
-      ORDER BY created_at ASC
-      LIMIT 1
-    `;
-    isOp = Boolean(first[0] && Number(first[0].id) === postId);
-  } catch {
-    isOp = true;
-  }
-
-  return (
-    <>
-      <div className="breadcrumbs">
-        <Link href="/forum">foro</Link> /{" "}
-        <Link href={`/forum/${post.category_slug}`}>
-          {String(post.category_name)}
-        </Link>{" "}
-        /{" "}
-        <Link href={`/forum/thread/${threadId}`}>
-          thread #{threadId}
-        </Link>{" "}
-        / post #{postId}
-      </div>
-
-      <Panel
-        title={`~/post/${postId}`}
-        right={
-          <ShareButton
-            path={path}
-            title={String(post.thread_title)}
-            text={excerptBody(String(post.body), 120)}
-          />
-        }
-      >
-        <h1>{String(post.thread_title)}</h1>
-        <p className="muted">
-          post compartible con Open Graph ·{" "}
-          <Link href={`/forum/thread/${threadId}`}>ver hilo completo →</Link>
-        </p>
-      </Panel>
-
-      <article
-        className={`post${rankPostClass(rank) ? ` ${rankPostClass(rank)}` : ""}`}
-        id={`post-${postId}`}
-      >
-        <div className="post-meta">
-          <span>
-            <span className={`user ${rankUserClass(rank)}`.trim()}>
-              @{String(post.author_name)}
-            </span>
-            {rank ? (
-              <>
-                {" "}
-                <RankBadge rank={rank} />
-              </>
-            ) : null}
-          </span>
-          <span className={rankNameClass(rank)}>{String(post.author_role)}</span>
-          <span>{new Date(String(post.created_at)).toLocaleString()}</span>
-          <ShareButton
-            path={path}
-            title={String(post.thread_title)}
-            text={excerptBody(String(post.body), 120)}
-          />
-          {canDelete ? (
-            <DeletePostButton
-              postId={postId}
-              categorySlug={String(post.category_slug || "")}
-            />
-          ) : null}
-        </div>
-        <PostBody
-          body={body}
-          mode={isOp ? "markdown" : "plain"}
-          previews={previews}
-        />
-      </article>
-    </>
-  );
+  return <ForumApp initialThreadId={threadId} />;
 }

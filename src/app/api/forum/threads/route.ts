@@ -18,6 +18,8 @@ export async function GET(req: Request) {
           t.id, t.category_id, t.author_id, t.title, t.locked, t.sticky,
           t.created_at, t.updated_at,
           u.username AS author_name,
+          u.role AS author_role,
+          u.is_vip AS author_is_vip,
           c.slug AS category_slug,
           c.name AS category_name,
           COUNT(p.id)::int AS post_count
@@ -26,7 +28,7 @@ export async function GET(req: Request) {
         JOIN categories c ON c.id = t.category_id
         LEFT JOIN posts p ON p.thread_id = t.id
         WHERE c.slug = ${category}
-        GROUP BY t.id, u.username, c.slug, c.name
+        GROUP BY t.id, u.username, u.role, u.is_vip, c.slug, c.name
         ORDER BY t.sticky DESC, t.updated_at DESC
         LIMIT ${limit}
       `;
@@ -36,6 +38,8 @@ export async function GET(req: Request) {
           t.id, t.category_id, t.author_id, t.title, t.locked, t.sticky,
           t.created_at, t.updated_at,
           u.username AS author_name,
+          u.role AS author_role,
+          u.is_vip AS author_is_vip,
           c.slug AS category_slug,
           c.name AS category_name,
           COUNT(p.id)::int AS post_count
@@ -43,7 +47,7 @@ export async function GET(req: Request) {
         JOIN users u ON u.id = t.author_id
         JOIN categories c ON c.id = t.category_id
         LEFT JOIN posts p ON p.thread_id = t.id
-        GROUP BY t.id, u.username, c.slug, c.name
+        GROUP BY t.id, u.username, u.role, u.is_vip, c.slug, c.name
         ORDER BY t.sticky DESC, t.updated_at DESC
         LIMIT ${limit}
       `;
@@ -85,10 +89,26 @@ export async function POST(req: Request) {
     const db = getDb();
 
     const cats = await db`
-      SELECT id FROM categories WHERE slug = ${categorySlug} LIMIT 1
+      SELECT
+        c.id,
+        (
+          SELECT COUNT(*)::int FROM categories ch WHERE ch.parent_id = c.id
+        ) AS child_count
+      FROM categories c
+      WHERE c.slug = ${categorySlug}
+      LIMIT 1
     `;
     if (!cats[0]) {
       return NextResponse.json({ error: "categoría no encontrada" }, { status: 404 });
+    }
+    if (Number(cats[0].child_count) > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "este board es una sección; elegí una subcategoría (ej. // random)",
+        },
+        { status: 400 }
+      );
     }
     const categoryId = cats[0].id as number;
 

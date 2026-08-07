@@ -19,6 +19,8 @@ export async function GET(req: Request) {
         t.id, t.category_id, t.author_id, t.title, t.locked, t.sticky,
         t.created_at, t.updated_at,
         u.username AS author_name,
+        u.role AS author_role,
+        u.is_vip AS author_is_vip,
         c.slug AS category_slug,
         c.name AS category_name
       FROM threads t

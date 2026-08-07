@@ -68,8 +68,13 @@ export async function ensureSchema() {
       slug VARCHAR(64) UNIQUE NOT NULL,
       name VARCHAR(128) NOT NULL,
       description TEXT NOT NULL DEFAULT '',
-      sort_order INT NOT NULL DEFAULT 0
+      sort_order INT NOT NULL DEFAULT 0,
+      parent_id INT REFERENCES categories(id) ON DELETE SET NULL
     )
+  `;
+  await db`
+    ALTER TABLE categories
+    ADD COLUMN IF NOT EXISTS parent_id INT REFERENCES categories(id) ON DELETE SET NULL
   `;
 
   await db`
@@ -143,17 +148,8 @@ export async function ensureSchema() {
       WHERE read_at IS NULL
   `;
 
-  // Seed default categories if empty
-  const existing = await db`SELECT COUNT(*)::int AS n FROM categories`;
-  if (existing[0]?.n === 0) {
-    await db`
-      INSERT INTO categories (slug, name, description, sort_order) VALUES
-        ('general', '// general', 'Charla libre del nodo. Presentaciones, ruido, ideas.', 10),
-        ('rxos', '// rxos-dev', 'Desarrollo de RXos: kernel, drivers, toolchain, bugs.', 20),
-        ('debate', '// debate', 'Política tech, privacidad, open hardware, activismo digital.', 30),
-        ('ops', '// ops-infra', 'Infra, despliegues, donaciones, coordinación del club.', 40)
-    `;
-  }
+  // Seed / upsert categorías (incluye jerarquía offtopic)
+  await seedCategories(db);
 
   // Owner del nodo: roger / rogynavarro@gmail.com
   await db`
@@ -162,6 +158,110 @@ export async function ensureSchema() {
     WHERE lower(username) = 'roger'
        OR lower(email) = 'rogynavarro@gmail.com'
   `;
+}
+
+/** Boards del foro. parent_slug null = top-level. */
+const CATEGORY_SEED: Array<{
+  slug: string;
+  name: string;
+  description: string;
+  sort_order: number;
+  parent_slug: string | null;
+}> = [
+  {
+    slug: "general",
+    name: "// general",
+    description: "Charla libre del nodo. Presentaciones, ruido, ideas.",
+    sort_order: 10,
+    parent_slug: null,
+  },
+  {
+    slug: "rxos",
+    name: "// rxos-dev",
+    description: "Desarrollo de RXos: kernel, drivers, toolchain, bugs.",
+    sort_order: 20,
+    parent_slug: null,
+  },
+  {
+    slug: "debate",
+    name: "// debate",
+    description: "Política tech, privacidad, open hardware, activismo digital.",
+    sort_order: 30,
+    parent_slug: null,
+  },
+  {
+    slug: "ops",
+    name: "// ops-infra",
+    description: "Infra, despliegues, donaciones, coordinación del club.",
+    sort_order: 40,
+    parent_slug: null,
+  },
+  {
+    slug: "offtopic",
+    name: "// offtopic",
+    description:
+      "Zona libre: random, memes, anime, ciencia. Sin contenido NSFW.",
+    sort_order: 50,
+    parent_slug: null,
+  },
+  {
+    slug: "random",
+    name: "// random",
+    description:
+      "Tablón general principal de offtopic. Charla libre. Sin NSFW.",
+    sort_order: 51,
+    parent_slug: "offtopic",
+  },
+  {
+    slug: "memes",
+    name: "// memes",
+    description: "Memes, shitposts e imágenes. Sin contenido NSFW.",
+    sort_order: 52,
+    parent_slug: "offtopic",
+  },
+  {
+    slug: "anime",
+    name: "// anime",
+    description: "Anime, manga y cultura otaku. Sin contenido NSFW.",
+    sort_order: 53,
+    parent_slug: "offtopic",
+  },
+  {
+    slug: "ciencia",
+    name: "// ciencia",
+    description: "Ciencia, investigación, divulgación y tech hard.",
+    sort_order: 54,
+    parent_slug: "offtopic",
+  },
+];
+
+async function seedCategories(db: NeonQueryFunction<false, false>) {
+  // 1) Upsert top-level + all by slug (parent_id after parents exist)
+  for (const c of CATEGORY_SEED) {
+    await db`
+      INSERT INTO categories (slug, name, description, sort_order)
+      VALUES (${c.slug}, ${c.name}, ${c.description}, ${c.sort_order})
+      ON CONFLICT (slug) DO UPDATE SET
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        sort_order = EXCLUDED.sort_order
+    `;
+  }
+
+  // 2) Wire parent_id for subcategorías
+  for (const c of CATEGORY_SEED) {
+    if (!c.parent_slug) {
+      await db`
+        UPDATE categories SET parent_id = NULL WHERE slug = ${c.slug}
+      `;
+      continue;
+    }
+    await db`
+      UPDATE categories
+      SET parent_id = (SELECT id FROM categories WHERE slug = ${c.parent_slug} LIMIT 1)
+      WHERE slug = ${c.slug}
+    `;
+  }
 }
 
 export type UserRow = {
@@ -190,6 +290,7 @@ export type CategoryRow = {
   name: string;
   description: string;
   sort_order: number;
+  parent_id: number | null;
 };
 
 export type ThreadRow = {

@@ -9,8 +9,8 @@ const MUTE_KEY = "kc_muzak_muted";
 
 /**
  * Mini reproductor global.
- * HOME → homeplaylist (elevator).
- * /forum y /donate → forumanddonateplaylist.
+ * HOME → reproductormp3/playlist_para_home.
+ * /forum y /donate → reproductormp3/playlist_para_forum_y_donate.
  */
 export default function AmbientMusicPlayer() {
   const path = usePathname() || "/";

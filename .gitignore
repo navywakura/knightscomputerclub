@@ -27,10 +27,10 @@ next-env.d.ts
 # master logo source (6MB+); use public/knightslabs_logo.png in the app
 /knightslabs_logo.png
 
-# audio local suelto (no commitear raíz)
+# audio local suelto (no commitear raíz ni fuente)
 /*.mp3
+/reproductormp3/
 *.wav
 *.flac
-# playlists del sitio (sí van a public/)
-!public/homeplaylist/*.mp3
-!public/forumanddonateplaylist/*.mp3
+# playlists servidas por Next (public/)
+!public/reproductormp3/**/*.mp3

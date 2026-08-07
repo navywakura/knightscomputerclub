@@ -4,7 +4,13 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import ImageAttach from "@/components/ImageAttach";
 
-export default function ReplyForm({ threadId }: { threadId: number }) {
+type Props = {
+  threadId: number;
+  /** Si se pasa, se llama al publicar (SPA) en vez de router.refresh() */
+  onPosted?: () => void;
+};
+
+export default function ReplyForm({ threadId, onPosted }: Props) {
   const router = useRouter();
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
@@ -26,7 +32,8 @@ export default function ReplyForm({ threadId }: { threadId: number }) {
         return;
       }
       setBody("");
-      router.refresh();
+      if (onPosted) onPosted();
+      else router.refresh();
     } catch {
       setError("red caída");
     } finally {

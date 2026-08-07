@@ -88,8 +88,13 @@ async function main() {
       slug VARCHAR(64) UNIQUE NOT NULL,
       name VARCHAR(128) NOT NULL,
       description TEXT NOT NULL DEFAULT '',
-      sort_order INT NOT NULL DEFAULT 0
+      sort_order INT NOT NULL DEFAULT 0,
+      parent_id INT REFERENCES categories(id) ON DELETE SET NULL
     )
+  `;
+  await sql`
+    ALTER TABLE categories
+    ADD COLUMN IF NOT EXISTS parent_id INT REFERENCES categories(id) ON DELETE SET NULL
   `;
 
   await sql`
@@ -158,19 +163,40 @@ async function main() {
       WHERE read_at IS NULL
   `;
 
-  const existing = await sql`SELECT COUNT(*)::int AS n FROM categories`;
-  if (existing[0]?.n === 0) {
+  const categorySeed = [
+    ["general", "// general", "Charla libre del nodo. Presentaciones, ruido, ideas.", 10, null],
+    ["rxos", "// rxos-dev", "Desarrollo de RXos: kernel, drivers, toolchain, bugs.", 20, null],
+    ["debate", "// debate", "Política tech, privacidad, open hardware, activismo digital.", 30, null],
+    ["ops", "// ops-infra", "Infra, despliegues, donaciones, coordinación del club.", 40, null],
+    ["offtopic", "// offtopic", "Zona libre: random, memes, anime, ciencia. Sin contenido NSFW.", 50, null],
+    ["random", "// random", "Tablón general principal de offtopic. Charla libre. Sin NSFW.", 51, "offtopic"],
+    ["memes", "// memes", "Memes, shitposts e imágenes. Sin contenido NSFW.", 52, "offtopic"],
+    ["anime", "// anime", "Anime, manga y cultura otaku. Sin contenido NSFW.", 53, "offtopic"],
+    ["ciencia", "// ciencia", "Ciencia, investigación, divulgación y tech hard.", 54, "offtopic"],
+  ];
+
+  for (const [slug, name, description, sort_order] of categorySeed) {
     await sql`
-      INSERT INTO categories (slug, name, description, sort_order) VALUES
-        ('general', '// general', 'Charla libre del nodo. Presentaciones, ruido, ideas.', 10),
-        ('rxos', '// rxos-dev', 'Desarrollo de RXos: kernel, drivers, toolchain, bugs.', 20),
-        ('debate', '// debate', 'Política tech, privacidad, open hardware, activismo digital.', 30),
-        ('ops', '// ops-infra', 'Infra, despliegues, donaciones, coordinación del club.', 40)
+      INSERT INTO categories (slug, name, description, sort_order)
+      VALUES (${slug}, ${name}, ${description}, ${sort_order})
+      ON CONFLICT (slug) DO UPDATE SET
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        sort_order = EXCLUDED.sort_order
     `;
-    console.log("[kc] categorías seed OK");
-  } else {
-    console.log("[kc] categorías ya existen, skip seed");
   }
+  for (const [slug, , , , parentSlug] of categorySeed) {
+    if (!parentSlug) {
+      await sql`UPDATE categories SET parent_id = NULL WHERE slug = ${slug}`;
+      continue;
+    }
+    await sql`
+      UPDATE categories
+      SET parent_id = (SELECT id FROM categories WHERE slug = ${parentSlug} LIMIT 1)
+      WHERE slug = ${slug}
+    `;
+  }
+  console.log("[kc] categorías seed/upsert OK (incl. offtopic)");
 
   const owners = await sql`
     UPDATE users
