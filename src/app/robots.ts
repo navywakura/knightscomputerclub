@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 import { getSiteUrl } from "@/lib/site";
 
 /**
- * SEO: posts e hilos del foro son públicos e indexables.
- * La SPA /forum (browse) y nexo/admin/auth siguen fuera del índice.
+ * SEO: posts, hilos y perfiles /u/ son públicos e indexables.
+ * nexo/admin/auth/settings siguen fuera del índice.
  */
 export default function robots(): MetadataRoute.Robots {
   const base = getSiteUrl();

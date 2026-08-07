@@ -5242,6 +5242,16 @@ body.nexo-app-active footer {
   font-size: 0.85rem;
 }
 
+.user-profile-link {
+  border-bottom: none;
+  text-decoration: none;
+}
+
+.user-profile-link:hover {
+  border-bottom: 1px dotted currentColor;
+  text-shadow: 0 0 8px var(--green-glow);
+}
+
 .settings-email-block {
   margin: 10px 0 14px;
   padding: 10px 12px;

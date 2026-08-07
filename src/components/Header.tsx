@@ -50,6 +50,10 @@ function buildNavItems(user: User | null) {
       else items.push(nexoItem);
     }
     items.push({ href: "/forum/new", label: "new_thread" });
+    items.push({
+      href: `/u/${encodeURIComponent(user.username)}`,
+      label: "perfil",
+    });
     items.push({ href: "/settings", label: "settings" });
   }
   if (user && isOwnerUser(user)) {
@@ -182,22 +186,33 @@ export default function Header() {
               user ? (
                 <span className="user-chip">
                   <span className="online">●</span>{" "}
-                  <span
-                    className={rankNameClass(
-                      getRank({
-                        role: user.role,
-                        username: user.username,
-                        is_vip: user.is_vip,
-                      })
-                    )}
+                  <Link
+                    href={`/u/${encodeURIComponent(user.username)}`}
+                    className={`user-profile-link ${
+                      rankNameClass(
+                        getRank({
+                          role: user.role,
+                          username: user.username,
+                          is_vip: user.is_vip,
+                        })
+                      ) || ""
+                    }`}
+                    title="ver mi perfil"
                   >
                     @{user.username}
-                  </span>
+                  </Link>
                   <RankBadge
                     role={user.role}
                     username={user.username}
                     isVip={user.is_vip}
                   />
+                  <Link
+                    href={`/u/${encodeURIComponent(user.username)}`}
+                    className="user-settings-link"
+                    title="perfil público"
+                  >
+                    [perfil]
+                  </Link>
                   <Link href="/settings" className="user-settings-link">
                     [settings]
                   </Link>

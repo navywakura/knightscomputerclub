@@ -10,6 +10,7 @@ import { ensureSchema, getDb } from "@/lib/db";
 import { getSessionUser, parseConnections } from "@/lib/auth";
 import { getRank, rankNameClass } from "@/lib/ranks";
 import { excerptBody } from "@/lib/markdown";
+import { getSiteUrl } from "@/lib/site";
 import {
   getProfileTheme,
   profileThemeStyle,
@@ -88,6 +89,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       robots: { index: false, follow: true },
     };
   }
+  const base = getSiteUrl();
   const handle = String(u.username);
   const name = u.display_name
     ? `${u.display_name} (@${handle})`
@@ -96,18 +98,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? String(u.bio).slice(0, 180)
     : `Perfil de @${handle} en knightscomputer.club — nodo tecnoactivista`;
   const path = `/u/${encodeURIComponent(handle)}`;
-  const ogImage = `${path}/opengraph-image`;
+  const ogImage = `${base}${path}/opengraph-image`;
+  const avatarAbs = u.avatar_media_id
+    ? `${base}/api/media/${u.avatar_media_id}`
+    : null;
 
   return {
     title: name,
     description,
-    robots: { index: true, follow: true },
-    alternates: { canonical: path },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: { index: true, follow: true },
+    },
+    alternates: { canonical: `${base}${path}` },
     openGraph: {
       title: name,
       description,
       type: "profile",
-      url: path,
+      url: `${base}${path}`,
       siteName: "knightscomputer.club",
       locale: "es_ES",
       images: [
@@ -117,6 +126,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           height: 630,
           alt: name,
         },
+        ...(avatarAbs
+          ? [{ url: avatarAbs, alt: `@${handle}` }]
+          : []),
       ],
     },
     twitter: {
@@ -213,6 +225,28 @@ export default async function PublicProfilePage({ params }: Props) {
   }
   const handle = String(u.username);
   const posts = await loadUserPosts(Number(u.id));
+  const base = getSiteUrl();
+  const personLd = {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    mainEntity: {
+      "@type": "Person",
+      name: display,
+      alternateName: `@${handle}`,
+      url: `${base}/u/${encodeURIComponent(handle)}`,
+      description: u.bio ? String(u.bio) : undefined,
+      image: avatar
+        ? avatar.startsWith("http")
+          ? avatar
+          : `${base}${avatar}`
+        : undefined,
+      memberOf: {
+        "@type": "Organization",
+        name: "knightscomputer.club",
+        url: base,
+      },
+    },
+  };
 
   return (
     <main
@@ -223,6 +257,10 @@ export default async function PublicProfilePage({ params }: Props) {
       data-theme={theme.id}
       data-profile-user={handle}
     >
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(personLd) }}
+      />
       {customCss ? (
         <style
           dangerouslySetInnerHTML={{ __html: customCss }}

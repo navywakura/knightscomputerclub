@@ -92,7 +92,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${base}/u/${encodeURIComponent(String(u.username))}`,
       lastModified: u.created_at ? new Date(String(u.created_at)) : now,
       changeFrequency: "weekly" as const,
-      priority: 0.55,
+      priority: 0.7,
     }));
 
     return [
