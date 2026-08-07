@@ -38,8 +38,19 @@ export default function DonatePage() {
 
       <div className="donate-grid">
         {channels.map((ch) => (
-          <div key={ch.id} className="donate-card">
-            <div className="glyph">{ch.glyph}</div>
+          <div key={ch.id} className={`donate-card donate-${ch.id}`}>
+            <div className="donate-icon-wrap" aria-hidden>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                className="donate-icon"
+                src={ch.icon}
+                alt=""
+                width={48}
+                height={48}
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
             <h3>{ch.label}</h3>
             <p className="muted" style={{ marginBottom: 8 }}>
               {ch.hint}

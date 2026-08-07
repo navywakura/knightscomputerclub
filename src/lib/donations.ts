@@ -4,7 +4,10 @@ export type DonationChannel = {
   kind: "link" | "address";
   value: string;
   hint: string;
+  /** Fallback text glyph if icon missing */
   glyph: string;
+  /** Public path to brand icon */
+  icon: string;
 };
 
 export function getDonationChannels(): DonationChannel[] {
@@ -18,6 +21,7 @@ export function getDonationChannels(): DonationChannel[] {
         "https://paypal.me/PLACEHOLDER",
       hint: "fiat · clic y listo",
       glyph: "$",
+      icon: "/icons/paypal.png",
     },
     {
       id: "kofi",
@@ -27,6 +31,7 @@ export function getDonationChannels(): DonationChannel[] {
         process.env.NEXT_PUBLIC_KOFI_URL || "https://ko-fi.com/PLACEHOLDER",
       hint: "café para el kernel",
       glyph: "☕",
+      icon: "/icons/kofi.png",
     },
     {
       id: "btc",
@@ -37,6 +42,7 @@ export function getDonationChannels(): DonationChannel[] {
         "bc1qPLACEHOLDER_BITCOIN_ADDRESS",
       hint: "on-chain · L1",
       glyph: "₿",
+      icon: "/icons/bitcoin.png",
     },
     {
       id: "sol",
@@ -47,6 +53,7 @@ export function getDonationChannels(): DonationChannel[] {
         "PLACEHOLDER_SOLANA_ADDRESS",
       hint: "SOL · network",
       glyph: "◎",
+      icon: "/icons/solana.png",
     },
     {
       id: "usdt",
@@ -57,6 +64,7 @@ export function getDonationChannels(): DonationChannel[] {
         "PLACEHOLDER_USDT_TRC20_OR_ERC20",
       hint: "stable · TRC20/ERC20",
       glyph: "₮",
+      icon: "/icons/usdt.png",
     },
   ];
 }
