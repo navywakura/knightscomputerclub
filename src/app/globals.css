@@ -1624,3 +1624,467 @@ textarea {
   background: var(--amber) !important;
   color: #1a1000 !important;
 }
+
+/* ═══════════════════════════════════════════
+   AMBIENT MUZAK PLAYER (global mini player)
+   ═══════════════════════════════════════════ */
+.muzak-player {
+  position: fixed;
+  z-index: 9000;
+  right: 12px;
+  bottom: 12px;
+  max-width: min(320px, calc(100vw - 24px));
+  font-family: var(--font-ui);
+  border: 1px solid var(--border);
+  background: rgba(6, 14, 8, 0.94);
+  color: var(--text);
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.12), 4px 4px 0 #000;
+  backdrop-filter: blur(4px);
+}
+
+.muzak-player.lobby {
+  border-color: #8a7a55;
+  background: rgba(42, 36, 28, 0.94);
+  color: #e8dcc4;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(200, 170, 100, 0.2);
+}
+
+.muzak-toggle {
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  padding: 4px 8px;
+  text-align: left;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.muzak-player.node .muzak-toggle {
+  border-bottom-color: #1a3a22;
+  color: var(--cyan);
+}
+
+.muzak-player.lobby .muzak-toggle {
+  border-bottom-color: #6a5a40;
+  color: #d4b878;
+}
+
+.muzak-main {
+  padding: 8px 10px 10px;
+}
+
+.muzak-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 6px;
+  min-width: 0;
+}
+
+.muzak-zone {
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  opacity: 0.65;
+}
+
+.muzak-title {
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.muzak-player.node .muzak-title {
+  color: var(--green);
+}
+
+.muzak-player.lobby .muzak-title {
+  color: #f0e6d0;
+}
+
+.muzak-artist {
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+
+.muzak-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.muzak-btn {
+  font: inherit;
+  font-size: 0.85rem;
+  border: 1px solid;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px 8px;
+  line-height: 1.3;
+}
+
+.muzak-player.node .muzak-btn {
+  border-color: var(--border);
+  color: var(--green);
+}
+
+.muzak-player.node .muzak-btn:hover {
+  background: rgba(0, 255, 65, 0.1);
+}
+
+.muzak-player.lobby .muzak-btn {
+  border-color: #8a7a55;
+  color: #e8dcc4;
+}
+
+.muzak-player.lobby .muzak-btn:hover {
+  background: rgba(212, 184, 120, 0.15);
+}
+
+.muzak-btn.play {
+  min-width: 36px;
+  font-weight: 700;
+}
+
+.muzak-extra {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed;
+}
+
+.muzak-player.node .muzak-extra {
+  border-top-color: #1a3a22;
+}
+
+.muzak-player.lobby .muzak-extra {
+  border-top-color: #6a5a40;
+}
+
+.muzak-seek {
+  height: 6px;
+  background: rgba(128, 128, 128, 0.25);
+  cursor: pointer;
+  position: relative;
+  margin-bottom: 4px;
+}
+
+.muzak-seek-fill {
+  height: 100%;
+  background: var(--green);
+  pointer-events: none;
+}
+
+.muzak-player.lobby .muzak-seek-fill {
+  background: #d4b878;
+}
+
+.muzak-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  opacity: 0.6;
+  margin-bottom: 6px;
+}
+
+.muzak-vol-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.muzak-vol-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--green);
+}
+
+.muzak-player.lobby .muzak-vol-row input[type="range"] {
+  accent-color: #d4b878;
+}
+
+.muzak-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.muzak-list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 0.72rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+  padding: 3px 2px;
+  cursor: pointer;
+}
+
+.muzak-list button.on,
+.muzak-list button:hover {
+  opacity: 1;
+}
+
+.muzak-player.node .muzak-list button.on {
+  color: var(--green);
+}
+
+.muzak-player.lobby .muzak-list button.on {
+  color: #f0e6d0;
+}
+
+.muzak-credit {
+  margin: 8px 0 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  opacity: 0.5;
+  line-height: 1.3;
+}
+
+/* ═══════════════════════════════════════════
+   HOME ONLY — elevator / lobby / waiting room
+   (forum, donate, auth: unchanged cyber green)
+   ═══════════════════════════════════════════ */
+body.zone-home {
+  --bg: #1c1814;
+  --bg-panel: #2a241c;
+  --bg-deep: #14110e;
+  --green: #c9b896;
+  --green-dim: #8a7a55;
+  --green-glow: #d4b878;
+  --amber: #d4a574;
+  --text: #e8dcc4;
+  --text-dim: #9a8b6e;
+  --border: #6a5a40;
+  --border-bright: #c9b896;
+  --scanline: rgba(212, 184, 120, 0.025);
+  --crt-vignette: rgba(20, 12, 6, 0.45);
+  background: var(--bg-deep);
+  color: var(--text);
+}
+
+body.zone-home::before {
+  opacity: 0.35;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    var(--scanline) 3px,
+    var(--scanline) 6px
+  );
+}
+
+body.zone-home::after {
+  background:
+    radial-gradient(
+      ellipse at 50% 20%,
+      rgba(212, 184, 120, 0.08) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at center,
+      transparent 45%,
+      var(--crt-vignette) 100%
+    );
+}
+
+body.zone-home a {
+  color: #d4b878;
+  border-bottom-color: #8a7a55;
+}
+
+body.zone-home a:hover {
+  color: #fff8e8;
+  text-shadow: 0 0 8px rgba(212, 184, 120, 0.4);
+  border-bottom-color: #d4b878;
+}
+
+body.zone-home .site-header {
+  border-color: #6a5a40;
+  background: linear-gradient(180deg, #322a20 0%, #241e18 100%);
+  box-shadow: inset 0 1px 0 rgba(232, 220, 196, 0.08);
+}
+
+body.zone-home .brand {
+  color: #e8dcc4;
+  text-shadow: 0 0 10px rgba(212, 184, 120, 0.25);
+}
+
+body.zone-home .brand span {
+  color: #d4b878;
+}
+
+body.zone-home .ticker {
+  background: #1a1612;
+  border-color: #6a5a40;
+  color: #9a8b6e;
+}
+
+body.zone-home .nav a {
+  color: #9a8b6e;
+}
+
+body.zone-home .nav a.active,
+body.zone-home .nav a:hover {
+  color: #e8dcc4;
+}
+
+body.zone-home .panel {
+  border-color: #6a5a40;
+  background: linear-gradient(180deg, #2e2820 0%, #221c16 100%);
+  box-shadow: 3px 3px 0 #0c0a08, inset 0 0 40px rgba(0, 0, 0, 0.2);
+}
+
+body.zone-home .panel-title {
+  background: linear-gradient(90deg, #3a3228, #2a241c);
+  border-bottom-color: #6a5a40;
+  color: #d4b878;
+}
+
+body.zone-home .card {
+  border-color: #6a5a40;
+  background: #1e1a14;
+}
+
+body.zone-home .btn {
+  border-color: #8a7a55;
+  color: #e8dcc4;
+  background: #241e18;
+  box-shadow: 2px 2px 0 #0c0a08, inset 0 0 12px rgba(212, 184, 120, 0.06);
+}
+
+body.zone-home .btn:hover {
+  background: #d4b878;
+  color: #1a1410;
+  text-shadow: none;
+  box-shadow: 0 0 16px rgba(212, 184, 120, 0.3), 2px 2px 0 #0c0a08;
+}
+
+body.zone-home .btn.amber {
+  border-color: #d4a574;
+  color: #d4a574;
+}
+
+body.zone-home .btn.secondary {
+  color: #9a8b6e;
+}
+
+body.zone-home .glow {
+  text-shadow: 0 0 8px rgba(212, 184, 120, 0.45), 0 0 20px rgba(180, 150, 90, 0.2);
+}
+
+body.zone-home .glitch::before {
+  color: #a09070;
+}
+
+body.zone-home .glitch::after {
+  color: #b08060;
+}
+
+body.zone-home .footer,
+body.zone-home .site-footer {
+  border-color: #6a5a40;
+  color: #9a8b6e;
+}
+
+/* lobby page extras */
+.lobby-home {
+  position: relative;
+}
+
+.lobby-marquee {
+  overflow: hidden;
+  border: 1px solid #6a5a40;
+  background: #1a1612;
+  margin-bottom: 12px;
+  padding: 6px 0;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: #d4b878;
+}
+
+.lobby-marquee span {
+  display: inline-block;
+  padding-left: 100%;
+  white-space: nowrap;
+  animation: lobby-scroll 28s linear infinite;
+}
+
+@keyframes lobby-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+body.zone-home .lobby-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  letter-spacing: 0.06em;
+  color: #f0e6d0;
+  text-shadow: 0 0 12px rgba(212, 184, 120, 0.35);
+  margin: 0.2em 0 0.15em;
+}
+
+body.zone-home .lobby-sub {
+  color: #9a8b6e;
+  font-family: var(--font-ui);
+  letter-spacing: 0.08em;
+  font-size: 0.9rem;
+  margin-top: 0;
+}
+
+body.zone-home .lobby-ascii {
+  color: #a09070;
+  text-shadow: none;
+  opacity: 0.9;
+}
+
+body.zone-home .lobby-prompt .cmd {
+  color: #d4b878;
+}
+
+body.zone-home .lobby-const {
+  border-color: #8a7a55;
+  color: #d4b878;
+  background: rgba(212, 184, 120, 0.06);
+}
+
+body.zone-home .tag {
+  border-color: #6a5a40;
+  color: #d4b878;
+}
+
+body.zone-home .tag.hot {
+  border-color: #d4a574;
+  color: #d4a574;
+}
+
+body.zone-home .tag.ok {
+  border-color: #8a9a70;
+  color: #b0c090;
+}
+
+body.zone-home .stat .n {
+  color: #e8dcc4;
+}
+
+/* Ensure forum/donate/auth keep default cyber green:
+   only body.zone-home flips tokens. body.zone-ops is explicit no-op. */
+body.zone-ops {
+  /* intentional: use :root cyber green tokens */
+}

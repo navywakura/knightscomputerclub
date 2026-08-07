@@ -13,14 +13,23 @@ const ASCII = `
 
 export default function HomePage() {
   return (
-    <>
-      <Panel title="~/boot · welcome.sh">
-        <pre className="ascii">{ASCII}</pre>
-        <h1 className="glitch glow" data-text="ACCESO AL NODO">
-          ACCESO AL NODO
-        </h1>
-        <p className="prompt">
-          <span className="cmd">root@kc:~$</span> cat manifesto.txt
+    <div className="lobby-home">
+      <div className="lobby-marquee" aria-hidden>
+        <span>
+          ★ PLEASE HOLD ★ ELEVATOR MUSIC ★ GROUND FLOOR · FORUM · DONATE ★
+          WELCOME TO THE LOBBY ★ NON-COPYRIGHT JAZZ ★
+        </span>
+      </div>
+
+      <Panel title="lobby · ground floor">
+        <pre className="ascii lobby-ascii">{ASCII}</pre>
+        <h1 className="lobby-title">WELCOME TO THE LOBBY</h1>
+        <p className="lobby-sub">
+          knightscomputer.club · sala de espera del nodo
+        </p>
+        <p className="prompt lobby-prompt">
+          <span className="cmd">desk@lobby:~$</span> soft jazz · soft light · no
+          surveillance ads
           <span className="cursor" />
         </p>
         <p>
@@ -30,8 +39,8 @@ export default function HomePage() {
           sin algoritmo que te empuje al odio.
         </p>
         <p className="muted">
-          estética 2000 · terminal · underground · sin ads · sin trackers
-          corporativos
+          ambientación elevador / waiting room · al entrar al foro o donate el
+          tono vuelve al terminal verde
         </p>
         <div className="btn-row">
           <Link href="/donate" className="btn amber">
@@ -112,10 +121,9 @@ export default function HomePage() {
         </p>
       </Panel>
 
-      <div className="under-const">
-        ★ UNDER CONSTRUCTION ★ — el club crece en público — ★ BUILD IN
-        PROGRESS ★
+      <div className="under-const lobby-const">
+        ★ LOBBY OPEN ★ — elevator music playing — ★ PLEASE TAKE A SEAT ★
       </div>
-    </>
+    </div>
   );
 }

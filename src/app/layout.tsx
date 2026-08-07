@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import AmbientMusicPlayer from "@/components/AmbientMusicPlayer";
 import "./globals.css";
 import "../../packages/web-notify/src/react/styles.css";
 
@@ -69,6 +70,7 @@ export default function RootLayout({
           <main>{children}</main>
           <Footer />
         </div>
+        <AmbientMusicPlayer />
       </body>
     </html>
   );
