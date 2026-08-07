@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import RankBadge from "@/components/RankBadge";
 import { apiFetch } from "@/lib/platform";
 import { getRank, rankNameClass } from "@/lib/ranks";
@@ -13,14 +13,18 @@ import { isUiSfxEnabled, setUiSfxEnabled, playUiSfx } from "@/lib/ui-sfx";
 import {
   DEFAULT_PROFILE_THEME,
   PROFILE_THEMES,
+  getProfileTheme,
+  profileThemeStyle,
   type ProfileThemeId,
   isProfileThemeId,
 } from "@/lib/profile-themes";
 import {
   PROFILE_CSS_MAX,
   PROFILE_FONTS,
+  fontStackFor,
   type ProfileCustomStyle,
 } from "@/lib/profile-css";
+import type { CSSProperties } from "react";
 
 type Tab = "profile" | "friends" | "privacy" | "account";
 
@@ -558,6 +562,33 @@ export default function SettingsApp({
     }
   }
 
+  const liveTheme = useMemo(
+    () => getProfileTheme(profileTheme),
+    [profileTheme]
+  );
+  const settingsThemeStyle = useMemo(() => {
+    const base = profileThemeStyle(liveTheme);
+    // overrides en vivo (sin guardar aún)
+    if (customBg.trim()) {
+      base["--pt-card-bg"] = customBg.trim();
+      base["--pt-custom-bg"] = customBg.trim();
+    }
+    if (customPrimary.trim()) {
+      base["--pt-text"] = customPrimary.trim();
+      base["--pt-card-border"] = customPrimary.trim();
+    }
+    if (customAccent.trim()) {
+      base["--pt-accent"] = customAccent.trim();
+      base["--pt-link"] = customAccent.trim();
+      base["--pt-btn-border"] = customAccent.trim();
+      base["--pt-glow"] =
+        `color-mix(in srgb, ${customAccent.trim()} 45%, transparent)`;
+    }
+    const font = fontStackFor(customFont.trim() || undefined);
+    if (font) base["--pt-font"] = font;
+    return base as CSSProperties;
+  }, [liveTheme, customBg, customPrimary, customAccent, customFont]);
+
   if (loading) {
     return (
       <div className="settings-app">
@@ -584,7 +615,12 @@ export default function SettingsApp({
   });
 
   return (
-    <div className="settings-app">
+    <div
+      className={`settings-app settings-themed settings-theme-${liveTheme.id}`}
+      style={settingsThemeStyle}
+      data-settings-theme={liveTheme.id}
+    >
+      <div className="settings-theme-bg" aria-hidden />
       <header className="settings-head">
         <h1 className="settings-title">
           // configuración

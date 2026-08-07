@@ -4853,12 +4853,146 @@ body.nexo-app-active footer {
   max-width: 720px;
   margin: 0 auto;
   padding: 1.25rem 1rem 3rem;
+  position: relative;
 }
 
 .settings-app {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+/* tema de perfil aplicado solo dentro de /settings */
+.settings-themed {
+  color: var(--pt-text, var(--text));
+  font-family: var(--pt-font, var(--font-mono));
+  border-radius: 8px;
+  padding: 12px 12px 16px;
+  border: 1px solid var(--pt-card-border, var(--border));
+  background: var(--pt-card-bg, transparent);
+  box-shadow: 0 0 24px var(--pt-glow, transparent);
+}
+
+.settings-theme-bg {
+  display: none;
+}
+
+.settings-themed .settings-theme-bg {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 8px;
+  overflow: hidden;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.55) 0%,
+      rgba(0, 0, 0, 0.72) 100%
+    ),
+    var(--pt-bg-image, none);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.9;
+}
+
+.settings-themed > *:not(.settings-theme-bg) {
+  position: relative;
+  z-index: 1;
+}
+
+.settings-themed .settings-title {
+  color: var(--pt-accent, var(--green));
+  text-shadow: 0 0 12px var(--pt-glow, transparent);
+}
+
+.settings-themed .settings-tabs {
+  border-color: var(--pt-card-border, var(--border));
+  background: color-mix(in srgb, var(--pt-btn-bg, #050a06) 80%, transparent);
+}
+
+.settings-themed .settings-tabs button {
+  border-right-color: var(--pt-card-border, var(--border));
+  color: var(--pt-muted, var(--text-dim));
+}
+
+.settings-themed .settings-tabs button.on {
+  color: var(--pt-accent, var(--green));
+  background: var(--pt-accent-soft, color-mix(in srgb, var(--green) 12%, transparent));
+}
+
+.settings-themed .settings-form {
+  border-color: var(--pt-card-border, var(--border));
+  background: color-mix(in srgb, var(--pt-card-bg, #0a100c) 88%, transparent);
+  color: var(--pt-text, var(--text));
+}
+
+.settings-themed .settings-form label {
+  color: var(--pt-muted, var(--text-dim));
+}
+
+.settings-themed .settings-form input,
+.settings-themed .settings-form textarea,
+.settings-themed .settings-form select {
+  border-color: var(--pt-card-border, var(--border));
+  background: color-mix(in srgb, var(--pt-btn-bg, #050a06) 90%, black);
+  color: var(--pt-text, var(--text));
+}
+
+.settings-themed .settings-sub {
+  color: var(--pt-accent, var(--amber));
+}
+
+.settings-themed .muted {
+  color: var(--pt-muted, var(--text-dim));
+}
+
+.settings-themed a {
+  color: var(--pt-link, var(--green));
+  border-bottom-color: var(--pt-accent, var(--green-dim));
+}
+
+.settings-themed .btn {
+  border-color: var(--pt-btn-border, var(--border));
+  color: var(--pt-text, var(--text));
+  background: var(--pt-btn-bg, transparent);
+}
+
+.settings-themed .btn:hover {
+  border-color: var(--pt-accent, var(--green));
+  color: var(--pt-accent, var(--green));
+}
+
+.settings-themed .btn.secondary {
+  color: var(--pt-muted, var(--text-dim));
+}
+
+.settings-themed .form-ok {
+  border-color: var(--pt-accent, var(--border));
+  color: var(--pt-accent, var(--green));
+}
+
+.settings-themed .profile-theme-card {
+  border-color: var(--pt-card-border, var(--border));
+  background: color-mix(in srgb, var(--pt-btn-bg, #050a06) 90%, transparent);
+}
+
+.settings-themed .profile-theme-card.on {
+  box-shadow:
+    0 0 0 1px var(--pt-accent, var(--green)),
+    0 0 14px var(--pt-glow, rgba(0, 255, 65, 0.2));
+}
+
+.settings-themed .settings-banner {
+  border-color: var(--pt-card-border, var(--border));
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.55)),
+    color-mix(in srgb, var(--pt-accent, var(--green)) 8%, #050807);
+  background-size: cover;
+  background-position: center;
 }
 
 .settings-title {
