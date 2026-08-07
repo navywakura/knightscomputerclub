@@ -47,6 +47,14 @@ export async function ensureSchema() {
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS oauth_subject VARCHAR(128)
   `;
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_users_last_seen
+      ON users (last_seen DESC NULLS LAST)
+  `;
 
   await db`
     CREATE TABLE IF NOT EXISTS media (

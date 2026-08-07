@@ -2233,8 +2233,124 @@ body.forum-app-active footer {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(160px, 200px) minmax(220px, 1fr) minmax(280px, 1.4fr);
+  grid-template-columns: minmax(168px, 200px) minmax(240px, 1fr) minmax(280px, 1.25fr);
   overflow: hidden;
+}
+
+/* lectura dual: threads | posts — más espacio a posts */
+.forum-app-grid.split-read {
+  grid-template-columns: minmax(150px, 180px) minmax(260px, 0.85fr) minmax(340px, 1.55fr);
+}
+
+.forum-app.is-reading .forum-list {
+  border-right: 1px solid var(--border);
+}
+
+.forum-app.is-reading .forum-detail {
+  background: #060c08;
+}
+
+.forum-rail-tabs {
+  display: flex !important;
+  gap: 0;
+  padding: 0 !important;
+}
+
+.forum-rail-tabs button {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  background: transparent;
+  border: none;
+  border-right: 1px solid #14301a;
+  padding: 7px 4px;
+  cursor: pointer;
+}
+
+.forum-rail-tabs button:last-child {
+  border-right: none;
+}
+
+.forum-rail-tabs button.on {
+  color: var(--amber);
+  background: #0e1a10;
+  text-shadow: 0 0 6px rgba(255, 176, 0, 0.25);
+}
+
+.forum-rail-tabs .forum-online-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #33ff66;
+  margin: 0 4px 0 2px;
+  box-shadow: 0 0 6px #33ff66;
+  vertical-align: middle;
+}
+
+.forum-online {
+  padding: 6px 0 10px;
+}
+
+.forum-online-hint {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 0.72rem;
+  border-bottom: 1px solid #0f2214;
+}
+
+.forum-online-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.forum-online-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #0f2214;
+  font-size: 0.85rem;
+}
+
+.forum-online-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #33ff66;
+  box-shadow: 0 0 8px #33ff66;
+  flex-shrink: 0;
+  animation: forum-online-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes forum-online-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+}
+
+/* embeds OG dentro del pane de posts (más legibles) */
+.forum-detail .link-embeds {
+  margin-top: 10px;
+}
+
+.forum-detail .link-embed {
+  max-width: 100%;
+}
+
+.forum-detail .post-body {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .forum-pane {

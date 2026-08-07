@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
+import { previewsForPosts, type LinkPreview } from "@/lib/link-preview";
 import { safeNotifyMany } from "@/lib/notify";
 import { isOwnerUser } from "@/lib/ranks";
 
@@ -45,7 +46,23 @@ export async function GET(req: Request) {
       ORDER BY p.created_at ASC
     `;
 
-    return NextResponse.json({ thread: threads[0], posts });
+    // Open Graph embeds por post (cache + fetch)
+    let previews: Record<string, LinkPreview[]> = {};
+    try {
+      const map = await previewsForPosts(
+        posts.map((p) => ({
+          id: Number(p.id),
+          body: String(p.body || ""),
+        }))
+      );
+      previews = Object.fromEntries(
+        [...map.entries()].map(([id, list]) => [String(id), list])
+      );
+    } catch (e) {
+      console.error("[posts GET previews]", e);
+    }
+
+    return NextResponse.json({ thread: threads[0], posts, previews });
   } catch (e) {
     console.error("[posts GET]", e);
     return NextResponse.json({ error: "error al cargar posts" }, { status: 500 });

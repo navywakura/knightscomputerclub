@@ -16,6 +16,7 @@ import ReplyForm from "@/components/ReplyForm";
 import ShareButton from "@/components/ShareButton";
 import { getRank, isOwnerUser, rankNameClass, rankPostClass, rankUserClass } from "@/lib/ranks";
 import { excerptBody } from "@/lib/markdown";
+import type { LinkPreview } from "@/lib/link-preview";
 
 const WIRED_BOOT_TEXT = "Accediendo a la Wired...";
 const WIRED_BOOT_MIN_MS = 1600;
@@ -108,6 +109,14 @@ type Me = {
   is_vip?: boolean;
 };
 
+type OnlineUser = {
+  id: number;
+  username: string;
+  role: string;
+  is_vip?: boolean;
+  last_seen?: string;
+};
+
 export type ForumAppProps = {
   initialBoard?: string | null;
   initialThreadId?: number | null;
@@ -141,8 +150,13 @@ export default function ForumApp({
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [thread, setThread] = useState<ThreadDetail | null>(null);
   const [posts, setPosts] = useState<PostRow[]>([]);
+  const [previewsByPost, setPreviewsByPost] = useState<
+    Record<string, LinkPreview[]>
+  >({});
   const [recent, setRecent] = useState<ThreadRow[]>([]);
   const [me, setMe] = useState<Me | null>(null);
+  const [online, setOnline] = useState<OnlineUser[]>([]);
+  const [leftTab, setLeftTab] = useState<"boards" | "online">("boards");
 
   const [loadingCats, setLoadingCats] = useState(true);
   const [loadingThreads, setLoadingThreads] = useState(false);
@@ -223,23 +237,114 @@ export default function ForumApp({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "error");
       setThread(data.thread as ThreadDetail);
-      setPosts((data.posts || []) as PostRow[]);
-      if (data.thread?.category_slug) {
-        setBoardSlug(String(data.thread.category_slug));
+      const postList = (data.posts || []) as PostRow[];
+      setPosts(postList);
+      // OG embeds: API devuelve mapa id → previews
+      const raw = (data.previews || {}) as Record<string, LinkPreview[]>;
+      setPreviewsByPost(raw);
+
+      // fallback client: si el server no trajo embeds, resolver URLs del body
+      const needsFallback = postList.some((p) => {
+        const hasUrl = /https?:\/\//i.test(String(p.body || ""));
+        const hasPrev = (raw[String(p.id)] || []).length > 0;
+        return hasUrl && !hasPrev;
+      });
+      if (needsFallback) {
+        void (async () => {
+          const next: Record<string, LinkPreview[]> = { ...raw };
+          for (const p of postList) {
+            if ((next[String(p.id)] || []).length) continue;
+            const urls = String(p.body || "").match(
+              /https?:\/\/[^\s<>"'`)\]}]+/gi
+            );
+            if (!urls?.length) continue;
+            try {
+              const pr = await fetch("/api/forum/link-previews", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  urls: urls.map((u) => u.replace(/[.,;:!?)]+$/, "")).slice(0, 6),
+                }),
+              });
+              const pd = await pr.json();
+              if (pd.previews?.length) {
+                next[String(p.id)] = pd.previews as LinkPreview[];
+                setPreviewsByPost({ ...next });
+              }
+            } catch {
+              /* ignore */
+            }
+          }
+        })();
+      }
+
+      const slug = data.thread?.category_slug
+        ? String(data.thread.category_slug)
+        : null;
+      if (slug) {
+        setBoardSlug(slug);
+        // dual-pane: rellenar lista de hilos del board
+        try {
+          const tr = await fetch(
+            `/api/forum/threads?category=${encodeURIComponent(slug)}&limit=80`
+          );
+          const td = await tr.json();
+          if (td.threads) setThreads(td.threads as ThreadRow[]);
+        } catch {
+          /* ignore list fill */
+        }
       }
     } catch {
       setError("no se pudo cargar el hilo");
       setThread(null);
       setPosts([]);
+      setPreviewsByPost({});
     } finally {
       setLoadingPosts(false);
+    }
+  }, []);
+
+  const loadOnline = useCallback(async () => {
+    try {
+      const res = await fetch("/api/forum/presence");
+      const data = await res.json();
+      setOnline((data.online || []) as OnlineUser[]);
+    } catch {
+      setOnline([]);
+    }
+  }, []);
+
+  const beatPresence = useCallback(async () => {
+    try {
+      await fetch("/api/forum/presence", { method: "POST" });
+    } catch {
+      /* ignore */
     }
   }, []);
 
   useEffect(() => {
     loadCategories();
     loadMe();
-  }, [loadCategories, loadMe]);
+    loadOnline();
+  }, [loadCategories, loadMe, loadOnline]);
+
+  // heartbeat presencia + refresh online cada 30s
+  useEffect(() => {
+    if (booting) return;
+    let cancelled = false;
+    async function tick() {
+      if (cancelled) return;
+      // solo si hay sesión (POST 401 si no)
+      if (me) await beatPresence();
+      if (!cancelled) await loadOnline();
+    }
+    tick();
+    const iv = window.setInterval(tick, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(iv);
+    };
+  }, [booting, me, beatPresence, loadOnline]);
 
   // initial / board changes
   useEffect(() => {
@@ -442,8 +547,15 @@ export default function ForumApp({
       ? categories.filter((c) => c.parent_id === activeBoard.id)
       : [];
 
+  // dual-pane: lista de hilos visible también al leer un thread
   const listRows: ThreadRow[] =
-    mode === "home" ? recent : mode === "board" && !isHub ? threads : [];
+    mode === "home"
+      ? recent
+      : mode === "thread" || (mode === "board" && !isHub)
+        ? threads
+        : [];
+
+  const showingThread = mode === "thread" && !!thread;
 
   if (booting) {
     return (
@@ -454,7 +566,7 @@ export default function ForumApp({
   }
 
   return (
-    <div className="forum-app">
+    <div className={`forum-app${showingThread ? " is-reading" : ""}`}>
       <div className="forum-app-top">
         <div className="forum-app-brand">
           <span className="glow">FORO</span>
@@ -467,6 +579,18 @@ export default function ForumApp({
             onClick={selectHome}
           >
             overview
+          </button>
+          <button
+            type="button"
+            className={`forum-chip${leftTab === "online" ? " on" : ""}`}
+            onClick={() => {
+              setLeftTab("online");
+              setMobileCol("boards");
+              loadOnline();
+            }}
+            title="usuarios en línea"
+          >
+            online · {online.length}
           </button>
           <button
             type="button"
@@ -499,25 +623,86 @@ export default function ForumApp({
           className={mobileCol === "list" ? "on" : ""}
           onClick={() => setMobileCol("list")}
         >
-          list
+          threads
         </button>
         <button
           type="button"
           className={mobileCol === "detail" ? "on" : ""}
           onClick={() => setMobileCol("detail")}
         >
-          view
+          posts
         </button>
       </div>
 
-      <div className="forum-app-grid">
-        {/* ── boards rail ── */}
+      <div
+        className={`forum-app-grid${showingThread ? " split-read" : ""}`}
+      >
+        {/* ── boards / online rail ── */}
         <aside
           className={`forum-pane forum-boards${mobileCol === "boards" ? " show-mobile" : ""}`}
         >
-          <div className="forum-pane-head">boards</div>
+          <div className="forum-pane-head forum-rail-tabs">
+            <button
+              type="button"
+              className={leftTab === "boards" ? "on" : ""}
+              onClick={() => setLeftTab("boards")}
+            >
+              boards
+            </button>
+            <button
+              type="button"
+              className={leftTab === "online" ? "on" : ""}
+              onClick={() => {
+                setLeftTab("online");
+                loadOnline();
+              }}
+            >
+              online
+              <span className="forum-online-dot" aria-hidden />
+              {online.length}
+            </button>
+          </div>
           <div className="forum-pane-body">
-            {loadingCats ? (
+            {leftTab === "online" ? (
+              <div className="forum-online">
+                <p className="forum-online-hint muted">
+                  activos en los últimos 5 min
+                  {!me ? (
+                    <>
+                      .{" "}
+                      <Link href="/auth/login">login</Link> para aparecer.
+                    </>
+                  ) : null}
+                </p>
+                {online.length === 0 ? (
+                  <p className="muted forum-pad">nadie en línea (o sin heartbeat aún)</p>
+                ) : (
+                  <ul className="forum-online-list">
+                    {online.map((u) => {
+                      const rank = getRank({
+                        role: String(u.role || ""),
+                        username: String(u.username || ""),
+                        is_vip: Boolean(u.is_vip),
+                      });
+                      return (
+                        <li key={u.id} className="forum-online-item">
+                          <span className="forum-online-pulse" aria-hidden />
+                          <span className={rankNameClass(rank)}>
+                            @{u.username}
+                          </span>
+                          {rank ? (
+                            <>
+                              {" "}
+                              <RankBadge rank={rank} />
+                            </>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            ) : loadingCats ? (
               <p className="muted forum-pad">cargando…</p>
             ) : (
               <nav className="forum-board-nav">
@@ -567,21 +752,32 @@ export default function ForumApp({
           </div>
         </aside>
 
-        {/* ── thread list ── */}
+        {/* ── thread list (pane 1 de lectura dual) ── */}
         <section
           className={`forum-pane forum-list${mobileCol === "list" ? " show-mobile" : ""}`}
         >
           <div className="forum-pane-head">
-            <span>{listTitle}</span>
-            {mode === "board" && boardSlug && !isHub && me && (
-              <button
-                type="button"
-                className="forum-mini-btn"
-                onClick={() => openNew(boardSlug)}
-              >
-                + new
-              </button>
-            )}
+            <span>
+              {showingThread ? "threads" : listTitle}
+              {showingThread && activeBoard ? (
+                <span className="muted" style={{ fontWeight: 400 }}>
+                  {" "}
+                  · {activeBoard.name}
+                </span>
+              ) : null}
+            </span>
+            {(mode === "board" || mode === "thread") &&
+              boardSlug &&
+              !isHub &&
+              me && (
+                <button
+                  type="button"
+                  className="forum-mini-btn"
+                  onClick={() => openNew(boardSlug)}
+                >
+                  + new
+                </button>
+              )}
           </div>
           <div className="forum-pane-body">
             {activeBoard && (
@@ -605,12 +801,17 @@ export default function ForumApp({
               </div>
             )}
 
-            {loadingThreads && (mode === "home" || (mode === "board" && !isHub)) ? (
+            {loadingThreads &&
+            (mode === "home" ||
+              mode === "thread" ||
+              (mode === "board" && !isHub)) ? (
               <p className="muted forum-pad">cargando hilos…</p>
             ) : null}
 
             {!loadingThreads &&
-              (mode === "home" || (mode === "board" && !isHub)) &&
+              (mode === "home" ||
+                mode === "thread" ||
+                (mode === "board" && !isHub)) &&
               listRows.length === 0 && (
                 <p className="muted forum-pad">
                   board vacío.{" "}
@@ -670,7 +871,7 @@ export default function ForumApp({
           </div>
         </section>
 
-        {/* ── detail ── */}
+        {/* ── posts / detail (pane 2 de lectura dual) ── */}
         <section
           className={`forum-pane forum-detail${mobileCol === "detail" ? " show-mobile" : ""}`}
         >
@@ -678,7 +879,7 @@ export default function ForumApp({
             {mode === "thread" && thread ? (
               <>
                 <span className="forum-detail-title" title={thread.title}>
-                  {thread.title}
+                  posts · {thread.title}
                 </span>
                 <div className="forum-detail-tools">
                   {boardSlug && (
@@ -705,7 +906,7 @@ export default function ForumApp({
             ) : mode === "new" ? (
               <span>new thread</span>
             ) : (
-              <span>preview</span>
+              <span>posts</span>
             )}
           </div>
 
@@ -920,7 +1121,11 @@ export default function ForumApp({
                       <PostBody
                         body={p.body}
                         mode={i === 0 ? "markdown" : "plain"}
-                        previews={[]}
+                        previews={
+                          previewsByPost[String(p.id)] ||
+                          previewsByPost[p.id as unknown as string] ||
+                          []
+                        }
                       />
                     </article>
                   );

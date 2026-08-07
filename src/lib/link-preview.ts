@@ -163,9 +163,12 @@ async function fetchOgLive(url: string): Promise<LinkPreview> {
       redirect: "follow",
       signal: controller.signal,
       headers: {
+        // UA tipo browser: muchos sitios bloquean bots custom y no devuelven OG
         "User-Agent":
-          "knightscomputer.club-linkpreview/1.0 (+https://knightscomputer.club)",
-        Accept: "text/html,application/xhtml+xml",
+          "Mozilla/5.0 (compatible; KnightsComputerPreview/1.1; +https://knightscomputer.club) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
       },
     });
 
