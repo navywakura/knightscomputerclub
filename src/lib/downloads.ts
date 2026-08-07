@@ -66,10 +66,20 @@ export const DOWNLOAD_PLATFORMS: DownloadPlatform[] = [
   {
     id: "cli",
     name: "KCC CLI",
-    subtitle: "Terminal · tools del nodo",
-    status: "soon",
+    subtitle: "Terminal · // nexo only",
+    status: "ready",
     logo: "cli",
-    notes: "CLI para ops y desarrollo (RXos / nodo). Próximamente.",
+    version: "0.1.0",
+    cta: "Ver instalación (npm / monorepo)",
+    href: "https://github.com/navywakura/knightscomputerclub/tree/main/packages/kcc-cli",
+    alt: [
+      {
+        label: "README · comandos",
+        href: "https://github.com/navywakura/knightscomputerclub/blob/main/packages/kcc-cli/README.md",
+      },
+    ],
+    notes:
+      "Shell de terminal para chatear en Nexo y setear avatar/banner desde la CLI. Node ≥18: cd packages/kcc-cli && npm link",
   },
   {
     id: "android",
