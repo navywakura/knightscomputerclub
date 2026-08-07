@@ -4447,16 +4447,19 @@ body.nexo-app-active footer {
 /* ── página /descargar ── */
 .download-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
   margin: 18px 0 28px;
+  align-items: stretch;
 }
 
 .download-card {
   display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  padding: 16px 16px 14px;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  height: 100%;
+  padding: 16px;
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--bg-panel, #0a120a) 92%, transparent);
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -4473,54 +4476,57 @@ body.nexo-app-active footer {
 }
 
 .download-card.soon {
-  opacity: 0.72;
+  opacity: 0.78;
+}
+
+.download-card-top {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  min-width: 0;
 }
 
 .download-card-logo {
   flex-shrink: 0;
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
-  background: var(--bg-deep, #020403);
+  background: #0a0a0c;
   color: var(--green);
+  overflow: hidden;
+  border-radius: 6px;
 }
 
 .download-card.ready .download-card-logo {
-  color: var(--amber);
   border-color: color-mix(in srgb, var(--amber) 40%, var(--border));
 }
 
-.download-card-logo[data-platform="windows"] {
-  color: #00a4ef;
-}
-.download-card.ready .download-card-logo[data-platform="windows"] {
-  color: #5ec8ff;
-}
-.download-card-logo[data-platform="macos"] {
-  color: #c0c0c8;
-}
-.download-card-logo[data-platform="linux"] {
-  color: #e8b84a;
-}
 .download-card-logo[data-platform="cli"] {
   color: var(--green);
-}
-.download-card-logo[data-platform="android"] {
-  color: #3ddc84;
-}
-.download-card-logo[data-platform="ios"] {
-  color: #a8b0c0;
+  background: var(--bg-deep, #020403);
 }
 
 .platform-logo {
   display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.platform-logo--img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: auto;
 }
 
 .download-card-body {
   min-width: 0;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .download-card-head {
@@ -4528,28 +4534,38 @@ body.nexo-app-active footer {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-bottom: 2px;
+  margin-bottom: 0;
+  min-width: 0;
 }
 
 .download-card-head h2 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.45rem;
+  font-size: 1.4rem;
   letter-spacing: 0.04em;
   color: var(--text);
   font-weight: 400;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
 }
 
 .download-card-sub {
-  margin: 0 0 4px;
-  font-size: 0.85rem;
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .download-card-notes {
-  margin: 8px 0 10px;
-  font-size: 0.82rem;
+  margin: 6px 0 0;
+  font-size: 0.8rem;
   color: var(--text-dim);
-  line-height: 1.45;
+  line-height: 1.5;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  flex: 1;
 }
 
 .download-card-actions {
@@ -4557,6 +4573,15 @@ body.nexo-app-active footer {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  margin-top: 10px;
+}
+
+.download-card-actions .btn {
+  font-size: 0.8rem;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.25;
+  max-width: 100%;
 }
 
 .download-card-actions .btn:disabled,
@@ -4566,12 +4591,15 @@ body.nexo-app-active footer {
 }
 
 @media (max-width: 520px) {
-  .download-card {
-    flex-direction: column;
-    align-items: stretch;
+  .download-grid {
+    grid-template-columns: 1fr;
   }
   .download-card-logo {
-    width: 56px;
-    height: 56px;
+    width: 52px;
+    height: 52px;
+  }
+  .platform-logo--img {
+    width: 36px;
+    height: 36px;
   }
 }

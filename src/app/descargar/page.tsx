@@ -48,57 +48,58 @@ export default function DescargarPage() {
               key={p.id}
               className={`download-card${ready ? " ready" : " soon"}`}
             >
-              <div className="download-card-logo" data-platform={p.logo}>
-                <PlatformLogo platform={p.logo} size={52} />
+              <div className="download-card-top">
+                <div className="download-card-logo" data-platform={p.logo}>
+                  <PlatformLogo platform={p.logo} size={40} />
+                </div>
+                <div className="download-card-body">
+                  <header className="download-card-head">
+                    <h2>{p.name}</h2>
+                    {ready ? (
+                      <span className="tag ok">disponible</span>
+                    ) : (
+                      <span className="tag">próximamente</span>
+                    )}
+                  </header>
+                  <p className="download-card-sub muted">{p.subtitle}</p>
+                  {p.version ? (
+                    <p className="muted" style={{ fontSize: "0.8rem" }}>
+                      versión {p.version}
+                    </p>
+                  ) : null}
+                </div>
               </div>
-              <div className="download-card-body">
-                <header className="download-card-head">
-                  <h2>{p.name}</h2>
-                  {ready ? (
-                    <span className="tag ok">disponible</span>
-                  ) : (
-                    <span className="tag">próximamente</span>
-                  )}
-                </header>
-                <p className="download-card-sub muted">{p.subtitle}</p>
-                {p.version ? (
-                  <p className="muted" style={{ fontSize: "0.8rem" }}>
-                    versión {p.version}
-                  </p>
-                ) : null}
-                {p.notes ? (
-                  <p className="download-card-notes">{p.notes}</p>
-                ) : null}
-
-                <div className="download-card-actions">
-                  {ready && p.href ? (
-                    <>
+              {p.notes ? (
+                <p className="download-card-notes">{p.notes}</p>
+              ) : null}
+              <div className="download-card-actions">
+                {ready && p.href ? (
+                  <>
+                    <a
+                      className="btn"
+                      href={p.href}
+                      download
+                      rel="noopener noreferrer"
+                    >
+                      {p.cta || "[ descargar ]"}
+                    </a>
+                    {p.alt?.map((a) => (
                       <a
-                        className="btn"
-                        href={p.href}
-                        download
+                        key={a.href}
+                        className="btn secondary"
+                        href={a.href}
+                        target="_blank"
                         rel="noopener noreferrer"
                       >
-                        {p.cta || "[ descargar ]"}
+                        {a.label}
                       </a>
-                      {p.alt?.map((a) => (
-                        <a
-                          key={a.href}
-                          className="btn secondary"
-                          href={a.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {a.label}
-                        </a>
-                      ))}
-                    </>
-                  ) : (
-                    <button type="button" className="btn secondary" disabled>
-                      [ aún no disponible ]
-                    </button>
-                  )}
-                </div>
+                    ))}
+                  </>
+                ) : (
+                  <button type="button" className="btn secondary" disabled>
+                    [ aún no disponible ]
+                  </button>
+                )}
               </div>
             </article>
           );
