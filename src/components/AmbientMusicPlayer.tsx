@@ -1,15 +1,32 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { playlistForPath, type PlaylistId, type Track } from "@/lib/playlists";
 
-const VOL_KEY = "kc_muzak_vol";
-const MUTE_KEY = "kc_muzak_muted";
+const STATE_KEY = "kc_muzak_state_v1";
+const SAVE_INTERVAL_MS = 2000;
+
+type SavedState = {
+  playing: boolean;
+  playlistId: PlaylistId;
+  index: number;
+  currentTime: number;
+  volume: number;
+  muted: boolean;
+};
+
+const DEFAULT_SAVED: SavedState = {
+  playing: false,
+  playlistId: "home",
+  index: 0,
+  currentTime: 0,
+  volume: 0.35,
+  muted: false,
+};
 
 /**
- * Estado + Audio fuera de React: sobrevive a remounts y a cambios de ruta
- * (forum ↔ donate no reinician la canción).
+ * Estado + Audio fuera de React: sobrevive a remounts y a cambios de ruta.
  */
 type SharedMuzak = {
   audio: HTMLAudioElement | null;
@@ -18,6 +35,10 @@ type SharedMuzak = {
   wasPlaying: boolean;
   volume: number;
   muted: boolean;
+  currentTime: number;
+  hydrated: boolean;
+  pendingSeek: number | null;
+  unlockBound: boolean;
 };
 
 const shared: SharedMuzak = {
@@ -27,13 +48,65 @@ const shared: SharedMuzak = {
   wasPlaying: false,
   volume: 0.35,
   muted: false,
+  currentTime: 0,
+  hydrated: false,
+  pendingSeek: null,
+  unlockBound: false,
 };
+
+function readSaved(): SavedState {
+  if (typeof window === "undefined") return { ...DEFAULT_SAVED };
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    if (!raw) return { ...DEFAULT_SAVED };
+    const p = JSON.parse(raw) as Partial<SavedState>;
+    return {
+      playing: Boolean(p.playing),
+      playlistId: p.playlistId === "ops" ? "ops" : "home",
+      index: Math.max(0, Number(p.index) || 0),
+      currentTime: Math.max(0, Number(p.currentTime) || 0),
+      volume: Math.min(1, Math.max(0, Number(p.volume) ?? 0.35)),
+      muted: Boolean(p.muted),
+    };
+  } catch {
+    return { ...DEFAULT_SAVED };
+  }
+}
+
+function writeSaved(patch: Partial<SavedState>) {
+  if (typeof window === "undefined") return;
+  try {
+    const prev = readSaved();
+    const next: SavedState = {
+      playing: patch.playing ?? prev.playing,
+      playlistId: patch.playlistId ?? prev.playlistId,
+      index: patch.index ?? prev.index,
+      currentTime: patch.currentTime ?? prev.currentTime,
+      volume: patch.volume ?? prev.volume,
+      muted: patch.muted ?? prev.muted,
+    };
+    localStorage.setItem(STATE_KEY, JSON.stringify(next));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function persistNow() {
+  writeSaved({
+    playing: shared.wasPlaying,
+    playlistId: shared.playlistId || "home",
+    index: shared.index,
+    currentTime: shared.currentTime,
+    volume: shared.volume,
+    muted: shared.muted,
+  });
+}
 
 function getAudio(): HTMLAudioElement | null {
   if (typeof window === "undefined") return null;
   if (!shared.audio) {
     const a = new Audio();
-    a.preload = "metadata";
+    a.preload = "auto";
     a.volume = shared.muted ? 0 : shared.volume;
     a.muted = shared.muted;
     shared.audio = a;
@@ -41,42 +114,110 @@ function getAudio(): HTMLAudioElement | null {
   return shared.audio;
 }
 
-function loadTrack(a: HTMLAudioElement, src: string, resume: boolean) {
-  const current = a.getAttribute("data-src");
-  if (current === src) {
-    if (resume && a.paused) {
-      a.play().catch(() => {
-        shared.wasPlaying = false;
+/** Intenta autoplay; si el browser bloquea, reanuda en el primer gesto. */
+function tryAutoplay(a: HTMLAudioElement): Promise<boolean> {
+  return a
+    .play()
+    .then(() => {
+      shared.wasPlaying = true;
+      persistNow();
+      return true;
+    })
+    .catch(() => {
+      // Mantener intención de reproducir; desbloquear con gesto
+      shared.wasPlaying = true;
+      persistNow();
+      bindGestureUnlock(a);
+      return false;
+    });
+}
+
+function bindGestureUnlock(a: HTMLAudioElement) {
+  if (shared.unlockBound || typeof document === "undefined") return;
+  shared.unlockBound = true;
+
+  const unlock = () => {
+    if (!shared.wasPlaying) {
+      cleanup();
+      return;
+    }
+    a.play()
+      .then(() => {
+        persistNow();
+        cleanup();
+      })
+      .catch(() => {
+        /* sigue esperando otro gesto */
       });
+  };
+
+  const cleanup = () => {
+    shared.unlockBound = false;
+    document.removeEventListener("pointerdown", unlock, true);
+    document.removeEventListener("keydown", unlock, true);
+    document.removeEventListener("touchstart", unlock, true);
+  };
+
+  document.addEventListener("pointerdown", unlock, true);
+  document.addEventListener("keydown", unlock, true);
+  document.addEventListener("touchstart", unlock, true);
+}
+
+function loadTrack(
+  a: HTMLAudioElement,
+  src: string,
+  resume: boolean,
+  seekTo: number | null = null
+) {
+  const current = a.getAttribute("data-src");
+  const same = current === src;
+
+  if (!same) {
+    a.setAttribute("data-src", src);
+    a.src = src;
+    a.load();
+  }
+
+  const applySeek = () => {
+    const t = seekTo ?? shared.pendingSeek;
+    if (t != null && t > 0 && Number.isFinite(t)) {
+      try {
+        const max = a.duration;
+        if (Number.isFinite(max) && max > 0) {
+          a.currentTime = Math.min(t, Math.max(0, max - 0.25));
+        } else {
+          a.currentTime = t;
+        }
+      } catch {
+        /* ignore seek race */
+      }
+      shared.pendingSeek = null;
+    }
+  };
+
+  if (same) {
+    applySeek();
+    if (resume && a.paused) {
+      void tryAutoplay(a);
     }
     return;
   }
-  const t = a.currentTime;
-  a.setAttribute("data-src", src);
-  a.src = src;
-  a.load();
-  // solo resetear posición si cambió de archivo
-  if (current) {
-    a.currentTime = 0;
-  } else if (t > 0) {
-    // no-op: nuevo elemento
-  }
-  if (resume) {
-    a.play()
-      .then(() => {
-        shared.wasPlaying = true;
-      })
-      .catch(() => {
-        shared.wasPlaying = false;
-      });
-  }
+
+  const onReady = () => {
+    a.removeEventListener("loadedmetadata", onReady);
+    a.removeEventListener("canplay", onReady);
+    applySeek();
+    if (resume) void tryAutoplay(a);
+  };
+  a.addEventListener("loadedmetadata", onReady);
+  a.addEventListener("canplay", onReady);
+  // por si ya está listo
+  if (a.readyState >= 1) onReady();
 }
 
 /**
  * Mini reproductor global.
- * HOME (/) → playlist_para_home
- * resto (forum/donate/auth) → playlist_para_forum_y_donate
- * Misma zona = misma playlist = audio continuo al navegar.
+ * Estado (play, track, posición, vol) en localStorage → autoplay al volver.
  */
 export default function AmbientMusicPlayer() {
   const path = usePathname() || "/";
@@ -89,51 +230,90 @@ export default function AmbientMusicPlayer() {
   const [expanded, setExpanded] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const lastSave = useRef(0);
 
   const safeIndex = playlist.tracks.length
     ? index % playlist.tracks.length
     : 0;
   const track: Track | undefined = playlist.tracks[safeIndex];
 
-  // zona body class (solo home cambia estética)
+  // zona body class
   useEffect(() => {
     const isHome = path === "/" || path === "";
     document.body.classList.add(isHome ? "zone-home" : "zone-ops");
     document.body.classList.remove(isHome ? "zone-ops" : "zone-home");
-    // no limpiar en unmount por cambio de ruta: el cleanup
-    // entre navigations apagaba clases y forzaba reflow innecesario
   }, [path]);
 
-  // volume / mute desde storage (una vez)
+  // hidratar desde localStorage una sola vez
   useEffect(() => {
-    try {
-      const v = localStorage.getItem(VOL_KEY);
-      if (v != null) {
-        const n = Math.min(1, Math.max(0, Number(v)));
-        shared.volume = n;
-        setVolume(n);
+    if (shared.hydrated) {
+      const a = getAudio();
+      if (a) {
+        setPlaying(!a.paused && !a.ended);
+        setProgress(a.currentTime || 0);
+        setDuration(a.duration || 0);
+        setIndex(shared.index);
+        setVolume(shared.volume);
+        setMuted(shared.muted);
       }
-      const m = localStorage.getItem(MUTE_KEY);
-      if (m === "1") {
-        shared.muted = true;
-        setMuted(true);
-      }
-    } catch {
-      /* ignore */
+      return;
     }
+
+    const saved = readSaved();
+    shared.hydrated = true;
+    shared.volume = saved.volume;
+    shared.muted = saved.muted;
+    shared.wasPlaying = saved.playing;
+    shared.volume = saved.volume;
+    shared.currentTime = saved.currentTime;
+    shared.pendingSeek = saved.currentTime > 1 ? saved.currentTime : null;
+
+    // si la zona actual coincide con la guardada, restaurar índice;
+    // si no, al entrar a la zona se aplicará la playlist de la ruta
+    const pathPl = playlistForPath(
+      typeof window !== "undefined" ? window.location.pathname : "/"
+    );
+    if (saved.playlistId === pathPl.id) {
+      shared.index = saved.index % Math.max(pathPl.tracks.length, 1);
+      shared.playlistId = null; // forzar setup con seek en el effect de zona
+    } else {
+      // otra zona: al menos restaurar si querían play en esta zona
+      shared.index = 0;
+      shared.playlistId = null;
+      shared.pendingSeek = null;
+    }
+
+    setVolume(shared.volume);
+    setMuted(shared.muted);
+    setIndex(shared.index);
+
     const a = getAudio();
     if (a) {
       a.volume = shared.muted ? 0 : shared.volume;
       a.muted = shared.muted;
-      setPlaying(!a.paused && !a.ended);
-      setProgress(a.currentTime || 0);
-      setDuration(a.duration || 0);
-      // rehidratar índice si ya había playlist
-      if (shared.playlistId === playlist.id) {
-        setIndex(shared.index);
-      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    // guardar al salir de la pestaña / cerrar
+    const onHide = () => {
+      const el = getAudio();
+      if (el) shared.currentTime = el.currentTime || 0;
+      // si el browser pausó al background, no borrar intención de play
+      persistNow();
+    };
+    const onBeforeUnload = () => {
+      const el = getAudio();
+      if (el) shared.currentTime = el.currentTime || 0;
+      persistNow();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onBeforeUnload);
+    window.addEventListener("beforeunload", onBeforeUnload);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onBeforeUnload);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
   }, []);
 
   useEffect(() => {
@@ -143,34 +323,53 @@ export default function AmbientMusicPlayer() {
     shared.muted = muted;
     a.volume = muted ? 0 : volume;
     a.muted = muted;
+    writeSaved({ volume, muted });
   }, [volume, muted]);
 
-  // listeners del audio singleton (una vez)
+  // listeners audio
   useEffect(() => {
     const a = getAudio();
     if (!a) return;
 
-    const onTime = () => setProgress(a.currentTime);
+    const onTime = () => {
+      shared.currentTime = a.currentTime;
+      setProgress(a.currentTime);
+      const now = Date.now();
+      if (now - lastSave.current >= SAVE_INTERVAL_MS) {
+        lastSave.current = now;
+        persistNow();
+      }
+    };
     const onMeta = () => setDuration(a.duration || 0);
     const onPlay = () => {
       shared.wasPlaying = true;
       setPlaying(true);
+      persistNow();
     };
     const onPause = () => {
-      // no marcar wasPlaying=false aquí: un load() dispara pause
       setPlaying(false);
+      // solo persistir pause "real" si el user pausó (wasPlaying false)
+      // load() también dispara pause — no tocar wasPlaying aquí
+      if (a) shared.currentTime = a.currentTime || 0;
+      persistNow();
     };
     const onEnded = () => {
       shared.wasPlaying = true;
       setIndex((i) => {
-        const len = Math.max(
-          (playlistForPath(
-            typeof window !== "undefined" ? window.location.pathname : "/"
-          ).tracks.length || 1),
-          1
+        const pl = playlistForPath(
+          typeof window !== "undefined" ? window.location.pathname : "/"
         );
+        const len = Math.max(pl.tracks.length, 1);
         const next = (i + 1) % len;
         shared.index = next;
+        shared.currentTime = 0;
+        shared.pendingSeek = null;
+        writeSaved({
+          playing: true,
+          index: next,
+          currentTime: 0,
+          playlistId: pl.id,
+        });
         return next;
       });
     };
@@ -190,66 +389,115 @@ export default function AmbientMusicPlayer() {
     };
   }, []);
 
-  // solo cambiar audio al cambiar de ZONA (home ↔ ops), no entre subpáginas
+  // zona / playlist
   useEffect(() => {
     const a = getAudio();
-    if (!a) return;
+    if (!a || !shared.hydrated) return;
 
     if (shared.playlistId === playlist.id) {
-      // misma playlist: no tocar src; solo sincronizar UI
       setIndex(shared.index);
       setPlaying(!a.paused && !a.ended);
       return;
     }
 
-    // zona nueva → reiniciar en track 0 de la nueva playlist
-    const keep = shared.wasPlaying || !a.paused;
+    // cambiar de zona O primer setup
+    const keep = shared.wasPlaying;
+    const saved = readSaved();
+    const restoreIndex =
+      saved.playlistId === playlist.id
+        ? saved.index % Math.max(playlist.tracks.length, 1)
+        : 0;
+    const restoreTime =
+      saved.playlistId === playlist.id ? saved.currentTime : 0;
+
     shared.playlistId = playlist.id;
-    shared.index = 0;
-    setIndex(0);
-    setProgress(0);
+    shared.index = restoreIndex;
+    setIndex(restoreIndex);
+    setProgress(restoreTime);
     setDuration(0);
 
-    const first = playlist.tracks[0];
-    if (!first) {
+    if (restoreTime > 1) shared.pendingSeek = restoreTime;
+    else shared.pendingSeek = null;
+
+    const t = playlist.tracks[restoreIndex] || playlist.tracks[0];
+    if (!t) {
       a.pause();
       setPlaying(false);
       return;
     }
 
-    loadTrack(a, first.src, keep);
+    writeSaved({
+      playlistId: playlist.id,
+      index: restoreIndex,
+      currentTime: restoreTime,
+      playing: keep,
+    });
+
+    loadTrack(a, t.src, keep, restoreTime > 1 ? restoreTime : null);
     setPlaying(keep);
   }, [playlist.id, playlist]);
 
-  // cambio de track (next/prev/list) dentro de la misma playlist
+  // track change dentro de la zona
   useEffect(() => {
     const a = getAudio();
-    if (!a || !track) return;
+    if (!a || !track || !shared.hydrated) return;
     if (shared.playlistId !== playlist.id) return;
 
+    const prevIndex = shared.index;
     shared.index = safeIndex;
+
+    // si solo rehidratamos el mismo track, no forzar reload sin seek
+    const seek =
+      prevIndex === safeIndex ? shared.pendingSeek : null;
+    if (prevIndex !== safeIndex) {
+      shared.currentTime = 0;
+      shared.pendingSeek = null;
+      writeSaved({
+        index: safeIndex,
+        currentTime: 0,
+        playlistId: playlist.id,
+        playing: shared.wasPlaying,
+      });
+    }
+
     const resume = shared.wasPlaying || !a.paused || playing;
-    loadTrack(a, track.src, resume);
+    loadTrack(a, track.src, resume, seek);
   }, [safeIndex, track, playlist.id, playing]);
 
   const next = useCallback(() => {
     shared.wasPlaying = true;
+    shared.pendingSeek = null;
     setIndex((i) => {
       const n = (i + 1) % Math.max(playlist.tracks.length, 1);
       shared.index = n;
+      shared.currentTime = 0;
+      writeSaved({
+        playing: true,
+        index: n,
+        currentTime: 0,
+        playlistId: playlist.id,
+      });
       return n;
     });
-  }, [playlist.tracks.length]);
+  }, [playlist.tracks.length, playlist.id]);
 
   const prev = useCallback(() => {
     shared.wasPlaying = true;
+    shared.pendingSeek = null;
     setIndex((i) => {
       const n =
         i <= 0 ? Math.max(playlist.tracks.length - 1, 0) : i - 1;
       shared.index = n;
+      shared.currentTime = 0;
+      writeSaved({
+        playing: true,
+        index: n,
+        currentTime: 0,
+        playlistId: playlist.id,
+      });
       return n;
     });
-  }, [playlist.tracks.length]);
+  }, [playlist.tracks.length, playlist.id]);
 
   async function toggle() {
     const a = getAudio();
@@ -257,38 +505,35 @@ export default function AmbientMusicPlayer() {
     if (!a.paused) {
       a.pause();
       shared.wasPlaying = false;
+      shared.currentTime = a.currentTime || 0;
       setPlaying(false);
+      persistNow();
       return;
     }
     try {
       if (!a.getAttribute("data-src") && track) {
-        loadTrack(a, track.src, false);
+        loadTrack(a, track.src, false, shared.currentTime || null);
       }
       await a.play();
       shared.wasPlaying = true;
       setPlaying(true);
+      persistNow();
     } catch {
-      shared.wasPlaying = false;
+      shared.wasPlaying = true;
+      bindGestureUnlock(a);
       setPlaying(false);
+      persistNow();
     }
   }
 
   function onVol(v: number) {
     setVolume(v);
     shared.volume = v;
-    try {
-      localStorage.setItem(VOL_KEY, String(v));
-    } catch {
-      /* */
-    }
+    writeSaved({ volume: v });
     if (v > 0 && muted) {
       setMuted(false);
       shared.muted = false;
-      try {
-        localStorage.setItem(MUTE_KEY, "0");
-      } catch {
-        /* */
-      }
+      writeSaved({ muted: false, volume: v });
     }
   }
 
@@ -296,11 +541,7 @@ export default function AmbientMusicPlayer() {
     setMuted((m) => {
       const nextM = !m;
       shared.muted = nextM;
-      try {
-        localStorage.setItem(MUTE_KEY, nextM ? "1" : "0");
-      } catch {
-        /* */
-      }
+      writeSaved({ muted: nextM });
       return nextM;
     });
   }
@@ -309,7 +550,9 @@ export default function AmbientMusicPlayer() {
     const a = getAudio();
     if (!a || !duration) return;
     a.currentTime = ratio * duration;
+    shared.currentTime = a.currentTime;
     setProgress(a.currentTime);
+    persistNow();
   }
 
   function fmt(t: number) {
@@ -418,6 +661,14 @@ export default function AmbientMusicPlayer() {
                     onClick={() => {
                       shared.wasPlaying = true;
                       shared.index = i;
+                      shared.currentTime = 0;
+                      shared.pendingSeek = null;
+                      writeSaved({
+                        playing: true,
+                        index: i,
+                        currentTime: 0,
+                        playlistId: playlist.id,
+                      });
                       setIndex(i);
                       setPlaying(true);
                     }}
@@ -431,6 +682,9 @@ export default function AmbientMusicPlayer() {
               {isHome
                 ? "elevator / lounge muzak · playlist_para_home"
                 : "ops signal · playlist_para_forum_y_donate"}
+              {shared.wasPlaying && !playing ? (
+                <span className="muted"> · autoplay pendiente (click en la página)</span>
+              ) : null}
             </p>
           </div>
         ) : null}
