@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import RankBadge from "@/components/RankBadge";
+import ShareButton from "@/components/ShareButton";
 import { ensureSchema, getDb } from "@/lib/db";
 import { parseConnections } from "@/lib/auth";
 import { getRank, rankNameClass } from "@/lib/ranks";
@@ -84,10 +85,23 @@ export default async function PublicProfilePage({ params }: Props) {
             <span>{String(u.username).slice(0, 2)}</span>
           )}
         </div>
-        <h1 className="profile-public-name">
-          <span className={rankNameClass(rank) || ""}>{display}</span>{" "}
-          {rank ? <RankBadge rank={rank} /> : null}
-        </h1>
+        <div className="profile-public-heading">
+          <h1 className="profile-public-name">
+            <span className={rankNameClass(rank) || ""}>{display}</span>{" "}
+            {rank ? <RankBadge rank={rank} /> : null}
+          </h1>
+          <ShareButton
+            path={`/u/${encodeURIComponent(String(u.username))}`}
+            title={`@${String(u.username)} · knightscomputer.club`}
+            text={
+              u.bio
+                ? `${display} (@${String(u.username)}) — ${String(u.bio)}`
+                : `Perfil de @${String(u.username)} en knightscomputer.club`
+            }
+            label="[ compartir perfil ]"
+            className="profile-share-btn"
+          />
+        </div>
         <p className="muted">
           @{String(u.username)} · miembro desde{" "}
           {new Date(String(u.created_at)).toLocaleDateString()}
@@ -131,7 +145,18 @@ export default async function PublicProfilePage({ params }: Props) {
           </section>
         ) : null}
 
-        <div className="compose-toolbar" style={{ marginTop: 16 }}>
+        <div className="compose-toolbar profile-public-actions" style={{ marginTop: 16 }}>
+          <ShareButton
+            path={`/u/${encodeURIComponent(String(u.username))}`}
+            title={`@${String(u.username)} · knightscomputer.club`}
+            text={
+              u.bio
+                ? `${display} (@${String(u.username)}) — ${String(u.bio)}`
+                : `Perfil de @${String(u.username)} en knightscomputer.club`
+            }
+            label="[ compartir ]"
+            className="btn secondary"
+          />
           <Link href={`/nexo?dm_user=${encodeURIComponent(String(u.username))}`} className="btn">
             [ DM en nexo ]
           </Link>

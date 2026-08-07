@@ -5083,9 +5083,49 @@ body.nexo-app-active footer {
   height: 100%;
   object-fit: cover;
 }
-.profile-public-name {
+.profile-public-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
   margin: 12px 0 4px;
+}
+
+.profile-public-name {
+  margin: 0;
   font-size: 1.35rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.profile-share-btn {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: var(--green);
+  background: #061006;
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  cursor: pointer;
+  min-height: 36px;
+  flex-shrink: 0;
+}
+
+.profile-share-btn:hover {
+  border-color: var(--green);
+  color: #fff;
+  text-shadow: 0 0 8px var(--green-glow);
+}
+
+.profile-public-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profile-public-actions .btn,
+.profile-public-actions button.btn {
+  min-height: 40px;
 }
 .profile-public-bio {
   margin: 10px 0;

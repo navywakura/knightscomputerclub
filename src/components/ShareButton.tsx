@@ -3,29 +3,39 @@
 import { useState } from "react";
 
 type Props = {
-  /** Path absoluto del sitio, ej. /forum/post/12 */
+  /** Path absoluto del sitio, ej. /forum/post/12 o /u/roger */
   path: string;
   title?: string;
   text?: string;
+  /** Texto del botón en idle (default [share]) */
+  label?: string;
+  className?: string;
 };
 
-export default function ShareButton({ path, title, text }: Props) {
+export default function ShareButton({
+  path,
+  title,
+  text,
+  label = "[share]",
+  className = "mod-btn share-btn",
+}: Props) {
   const [status, setStatus] = useState<"idle" | "ok" | "err">("idle");
 
   async function share() {
     const url =
       typeof window !== "undefined"
-        ? `${window.location.origin}${path}`
+        ? `${window.location.origin}${path.startsWith("/") ? path : `/${path}`}`
         : path;
 
     try {
-      if (navigator.share) {
+      if (typeof navigator !== "undefined" && navigator.share) {
         await navigator.share({
           title: title || "knightscomputer.club",
           text: text || title,
           url,
         });
         setStatus("ok");
+        setTimeout(() => setStatus("idle"), 2000);
         return;
       }
     } catch {
@@ -39,17 +49,18 @@ export default function ShareButton({ path, title, text }: Props) {
     } catch {
       setStatus("err");
       prompt("Copiá el link:", url);
+      setTimeout(() => setStatus("idle"), 2000);
     }
   }
 
   return (
     <button
       type="button"
-      className="mod-btn share-btn"
-      onClick={share}
-      title="Compartir post (Open Graph)"
+      className={className}
+      onClick={() => void share()}
+      title={title || "Compartir enlace"}
     >
-      {status === "ok" ? "[copied]" : status === "err" ? "[err]" : "[share]"}
+      {status === "ok" ? "[copied]" : status === "err" ? "[err]" : label}
     </button>
   );
 }
