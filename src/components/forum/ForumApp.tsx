@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import ImageAttach from "@/components/ImageAttach";
 import PostBody from "@/components/PostBody";
 import RankBadge from "@/components/RankBadge";
@@ -9,6 +16,37 @@ import ReplyForm from "@/components/ReplyForm";
 import ShareButton from "@/components/ShareButton";
 import { getRank, isOwnerUser, rankNameClass, rankPostClass, rankUserClass } from "@/lib/ranks";
 import { excerptBody } from "@/lib/markdown";
+
+const WIRED_BOOT_TEXT = "Accediendo a la Wired...";
+const WIRED_BOOT_MIN_MS = 1600;
+
+function WiredBootScreen() {
+  return (
+    <div className="wired-boot" role="status" aria-live="polite" aria-busy="true">
+      <div className="wired-boot-noise" aria-hidden />
+      <div className="wired-boot-scan" aria-hidden />
+      <div className="wired-boot-vignette" aria-hidden />
+      <div className="wired-boot-inner">
+        <p className="wired-boot-label muted">SERIAL EXPERIMENTS · NODE FORUM</p>
+        <p className="wired-snake" aria-label={WIRED_BOOT_TEXT}>
+          {WIRED_BOOT_TEXT.split("").map((ch, i) => (
+            <span
+              key={`${ch}-${i}`}
+              className="wired-snake-char"
+              style={{ animationDelay: `${i * 0.055}s` }}
+            >
+              {ch === " " ? "\u00A0" : ch}
+            </span>
+          ))}
+        </p>
+        <div className="wired-boot-bar" aria-hidden>
+          <div className="wired-boot-bar-fill" />
+        </div>
+        <p className="wired-boot-sub">PRESENT DAY · PRESENT TIME</p>
+      </div>
+    </div>
+  );
+}
 
 export type ForumCategory = {
   id: number;
@@ -109,6 +147,10 @@ export default function ForumApp({
   const [loadingCats, setLoadingCats] = useState(true);
   const [loadingThreads, setLoadingThreads] = useState(false);
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [booting, setBooting] = useState(true);
+  const bootStartedAt = useRef(
+    typeof performance !== "undefined" ? performance.now() : Date.now()
+  );
   const [error, setError] = useState("");
 
   // new thread form
@@ -213,6 +255,22 @@ export default function ForumApp({
       loadThread(threadId);
     }
   }, [mode, threadId, loadThread]);
+
+  // boot screen: esperar datos iniciales + mínimo visual (snake VHS)
+  useEffect(() => {
+    if (!booting) return;
+    if (loadingCats) return;
+    if (mode === "home" && loadingThreads) return;
+    if (mode === "board" && loadingThreads) return;
+    if (mode === "thread" && loadingPosts) return;
+
+    const now =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    const elapsed = now - bootStartedAt.current;
+    const wait = Math.max(0, WIRED_BOOT_MIN_MS - elapsed);
+    const t = window.setTimeout(() => setBooting(false), wait);
+    return () => window.clearTimeout(t);
+  }, [booting, loadingCats, loadingThreads, loadingPosts, mode]);
 
   // sync URL without full remount friction
   useEffect(() => {
@@ -386,6 +444,14 @@ export default function ForumApp({
 
   const listRows: ThreadRow[] =
     mode === "home" ? recent : mode === "board" && !isHub ? threads : [];
+
+  if (booting) {
+    return (
+      <div className="forum-app forum-app-booting">
+        <WiredBootScreen />
+      </div>
+    );
+  }
 
   return (
     <div className="forum-app">
