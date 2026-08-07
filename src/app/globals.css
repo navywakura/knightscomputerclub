@@ -4443,3 +4443,135 @@ body.nexo-app-active footer {
   padding: 6px 8px;
   border: 1px dashed var(--border);
 }
+
+/* ── página /descargar ── */
+.download-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin: 18px 0 28px;
+}
+
+.download-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 16px 16px 14px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-panel, #0a120a) 92%, transparent);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.download-card.ready {
+  border-color: color-mix(in srgb, var(--green) 55%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 12%, transparent);
+}
+
+.download-card.ready:hover {
+  border-color: var(--green);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--green) 18%, transparent);
+}
+
+.download-card.soon {
+  opacity: 0.72;
+}
+
+.download-card-logo {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  background: var(--bg-deep, #020403);
+  color: var(--green);
+}
+
+.download-card.ready .download-card-logo {
+  color: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 40%, var(--border));
+}
+
+.download-card-logo[data-platform="windows"] {
+  color: #00a4ef;
+}
+.download-card.ready .download-card-logo[data-platform="windows"] {
+  color: #5ec8ff;
+}
+.download-card-logo[data-platform="macos"] {
+  color: #c0c0c8;
+}
+.download-card-logo[data-platform="linux"] {
+  color: #e8b84a;
+}
+.download-card-logo[data-platform="cli"] {
+  color: var(--green);
+}
+.download-card-logo[data-platform="android"] {
+  color: #3ddc84;
+}
+.download-card-logo[data-platform="ios"] {
+  color: #a8b0c0;
+}
+
+.platform-logo {
+  display: block;
+}
+
+.download-card-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.download-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.download-card-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  font-weight: 400;
+}
+
+.download-card-sub {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+}
+
+.download-card-notes {
+  margin: 8px 0 10px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+.download-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.download-card-actions .btn:disabled,
+.download-card-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 520px) {
+  .download-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .download-card-logo {
+    width: 56px;
+    height: 56px;
+  }
+}

@@ -21,6 +21,7 @@ type User = {
 
 const NAV = [
   { href: "/", label: "home" },
+  { href: "/descargar", label: "descargar" },
   { href: "/donate", label: "donate" },
   { href: "/forum", label: "forum" },
   { href: "/auth/login", label: "login" },
