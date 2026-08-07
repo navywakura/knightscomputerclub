@@ -73,6 +73,8 @@ export default function SettingsApp({ initialTab = "profile" }: Props) {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [pgpKey, setPgpKey] = useState("");
+  const [pgpFp, setPgpFp] = useState("");
 
   // friends
   const [friends, setFriends] = useState<FriendUser[]>([]);
@@ -99,6 +101,12 @@ export default function SettingsApp({ initialTab = "profile" }: Props) {
     setConn(u.connections || {});
     setAvatarPreview(u.avatar_url || null);
     setBannerPreview(u.banner_url || null);
+    setPgpKey(
+      (u as Me & { pgp_public_key?: string }).pgp_public_key || ""
+    );
+    setPgpFp(
+      (u as Me & { pgp_fingerprint?: string }).pgp_fingerprint || ""
+    );
   }, []);
 
   const loadFriends = useCallback(async () => {
@@ -219,6 +227,8 @@ export default function SettingsApp({ initialTab = "profile" }: Props) {
         bio,
         dm_privacy: dmPrivacy,
         connections: conn,
+        pgp_public_key: pgpKey,
+        pgp_fingerprint: pgpFp,
       };
       if (avatarId !== null) payload.avatar_media_id = avatarId;
       if (bannerId !== null) payload.banner_media_id = bannerId;
@@ -498,6 +508,28 @@ export default function SettingsApp({ initialTab = "profile" }: Props) {
               />
             </div>
           ))}
+
+          <h3 className="settings-sub">PGP (clave pública)</h3>
+          <p className="muted" style={{ fontSize: "0.85rem" }}>
+            Vinculá tu clave pública para verificar identidad en /nexo y el
+            foro. Se muestra en tu perfil público.
+          </p>
+          <label htmlFor="s-pgp-fp">fingerprint (hex)</label>
+          <input
+            id="s-pgp-fp"
+            value={pgpFp}
+            onChange={(e) => setPgpFp(e.target.value)}
+            placeholder="ABCD1234…"
+            maxLength={64}
+          />
+          <label htmlFor="s-pgp-key">bloque PUBLIC KEY</label>
+          <textarea
+            id="s-pgp-key"
+            value={pgpKey}
+            onChange={(e) => setPgpKey(e.target.value.slice(0, 12000))}
+            rows={6}
+            placeholder={"-----BEGIN PGP PUBLIC KEY BLOCK-----\n…"}
+          />
 
           <div className="compose-toolbar" style={{ marginTop: 16 }}>
             <button className="btn" type="submit" disabled={saving || uploading}>

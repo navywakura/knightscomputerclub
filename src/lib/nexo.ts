@@ -3,7 +3,12 @@
 import bcrypt from "bcryptjs";
 import { isOwnerUser } from "@/lib/ranks";
 
-export const NEXO_POLL_MS = 2500;
+/** Poll activo (pestaña visible). Antes 2.5s — más lag en móvil. */
+export const NEXO_POLL_MS = 4000;
+/** Poll en background (pestaña oculta). */
+export const NEXO_POLL_HIDDEN_MS = 20000;
+/** Agrupar mensajes del mismo autor (cascada, estilo Discord). */
+export const NEXO_GROUP_MS = 5 * 60 * 1000;
 export const NEXO_MSG_MAX = 4000;
 export const NEXO_BOARD_NAME_MAX = 64;
 export const NEXO_SLUG_MAX = 48;

@@ -177,6 +177,42 @@ export async function PATCH(req: Request) {
       }
     }
 
+    if ("pgp_public_key" in body || "pgp_fingerprint" in body) {
+      let key =
+        "pgp_public_key" in body
+          ? String(body.pgp_public_key ?? "").trim()
+          : undefined;
+      let fp =
+        "pgp_fingerprint" in body
+          ? String(body.pgp_fingerprint ?? "")
+              .trim()
+              .toUpperCase()
+              .replace(/[^0-9A-F]/g, "")
+              .slice(0, 64)
+          : undefined;
+      if (key !== undefined) {
+        if (key && !key.includes("BEGIN PGP PUBLIC KEY")) {
+          return NextResponse.json(
+            { error: "pgp_public_key: pegá un bloque PUBLIC KEY" },
+            { status: 400 }
+          );
+        }
+        key = key ? key.slice(0, 12000) : "";
+        await db`
+          UPDATE users
+          SET pgp_public_key = ${key || null}
+          WHERE id = ${user.id}
+        `;
+      }
+      if (fp !== undefined) {
+        await db`
+          UPDATE users
+          SET pgp_fingerprint = ${fp || null}
+          WHERE id = ${user.id}
+        `;
+      }
+    }
+
     if ("connections" in body && body.connections && typeof body.connections === "object") {
       const raw = body.connections as Record<string, unknown>;
       const keys = ["github", "twitter", "website", "discord", "youtube"] as const;
@@ -209,10 +245,21 @@ export async function PATCH(req: Request) {
       SELECT
         id, username, email, password_hash, role, is_vip, banned, created_at,
         display_name, avatar_media_id, banner_media_id, dm_privacy, bio,
-        email_verified, deleted_at, connections
+        email_verified, deleted_at, connections,
+        pgp_public_key, pgp_fingerprint
       FROM users WHERE id = ${user.id} LIMIT 1
     `;
-    return NextResponse.json({ user: toPublicUser(rows[0] as UserRow) });
+    const pub = toPublicUser(rows[0] as UserRow);
+    const r = rows[0] as Record<string, unknown>;
+    return NextResponse.json({
+      user: {
+        ...pub,
+        pgp_fingerprint: r.pgp_fingerprint
+          ? String(r.pgp_fingerprint)
+          : null,
+        pgp_public_key: r.pgp_public_key ? String(r.pgp_public_key) : null,
+      },
+    });
   } catch (e) {
     console.error("[profile PATCH]", e);
     return NextResponse.json(

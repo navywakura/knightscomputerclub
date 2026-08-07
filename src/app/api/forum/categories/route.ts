@@ -4,9 +4,10 @@ import { ensureSchema, getDb } from "@/lib/db";
 
 export async function GET() {
   try {
-    const user = await getSessionUser();
-    if (!user || user.banned) {
-      return NextResponse.json({ error: "login requerido" }, { status: 401 });
+    // público (guest puede ver boards en post compartido)
+    const user = await getSessionUser().catch(() => null);
+    if (user?.banned) {
+      return NextResponse.json({ error: "baneado" }, { status: 403 });
     }
     await ensureSchema();
     const db = getDb();

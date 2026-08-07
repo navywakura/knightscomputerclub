@@ -8,9 +8,10 @@ import { isOwnerUser } from "@/lib/ranks";
 
 export async function GET(req: Request) {
   try {
-    const user = await getSessionUser();
-    if (!user || user.banned) {
-      return NextResponse.json({ error: "login requerido" }, { status: 401 });
+    // Lectura pública (guest) para posts compartidos por enlace
+    const user = await getSessionUser().catch(() => null);
+    if (user?.banned) {
+      return NextResponse.json({ error: "baneado" }, { status: 403 });
     }
     await ensureSchema();
     const db = getDb();
@@ -25,8 +26,10 @@ export async function GET(req: Request) {
         t.id, t.category_id, t.author_id, t.title, t.locked, t.sticky,
         t.created_at, t.updated_at,
         u.username AS author_name,
+        u.display_name AS author_display_name,
         u.role AS author_role,
         u.is_vip AS author_is_vip,
+        u.avatar_media_id AS author_avatar_media_id,
         c.slug AS category_slug,
         c.name AS category_name
       FROM threads t
@@ -43,8 +46,10 @@ export async function GET(req: Request) {
       SELECT
         p.id, p.thread_id, p.author_id, p.body, p.created_at, p.updated_at,
         u.username AS author_name,
+        u.display_name AS author_display_name,
         u.role AS author_role,
-        u.is_vip AS author_is_vip
+        u.is_vip AS author_is_vip,
+        u.avatar_media_id AS author_avatar_media_id
       FROM posts p
       JOIN users u ON u.id = p.author_id
       WHERE p.thread_id = ${threadId}
@@ -67,7 +72,22 @@ export async function GET(req: Request) {
       console.error("[posts GET previews]", e);
     }
 
-    return NextResponse.json({ thread: threads[0], posts, previews });
+    const mapAuthor = (r: Record<string, unknown>) => ({
+      ...r,
+      author_avatar_url: r.author_avatar_media_id
+        ? `/api/media/${r.author_avatar_media_id}`
+        : null,
+      author_display_name: r.author_display_name
+        ? String(r.author_display_name)
+        : null,
+    });
+
+    return NextResponse.json({
+      thread: mapAuthor(threads[0] as Record<string, unknown>),
+      posts: posts.map((p) => mapAuthor(p as Record<string, unknown>)),
+      previews,
+      guest: !user,
+    });
   } catch (e) {
     console.error("[posts GET]", e);
     return NextResponse.json({ error: "error al cargar posts" }, { status: 500 });

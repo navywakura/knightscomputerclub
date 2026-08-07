@@ -56,8 +56,10 @@ type PostRow = {
   body: string;
   created_at: string;
   author_name: string;
+  author_display_name?: string | null;
   author_role?: string;
   author_is_vip?: boolean;
+  author_avatar_url?: string | null;
 };
 
 type ThreadDetail = {
@@ -1071,6 +1073,8 @@ export default function ForumApp({
                   const canDel =
                     me &&
                     (isOwnerUser(me) || me.id === Number(p.author_id));
+                  const display =
+                    p.author_display_name?.trim() || p.author_name;
                   return (
                     <article
                       key={p.id}
@@ -1078,11 +1082,35 @@ export default function ForumApp({
                       className={`post${postCls ? ` ${postCls}` : ""}`}
                     >
                       <div className="post-meta">
-                        <span>
+                        <span className="post-author-chip">
+                          <Link
+                            href={`/u/${encodeURIComponent(p.author_name)}`}
+                            className="post-avatar-link"
+                            title={`@${p.author_name}`}
+                          >
+                            {p.author_avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={p.author_avatar_url}
+                                alt=""
+                                className="post-avatar"
+                              />
+                            ) : (
+                              <span className="post-avatar initials">
+                                {String(p.author_name).slice(0, 2)}
+                              </span>
+                            )}
+                          </Link>
                           #{i + 1}{" "}
-                          <span className={`user${userCls ? ` ${userCls}` : ""}`}>
-                            @{p.author_name}
-                          </span>
+                          <Link
+                            href={`/u/${encodeURIComponent(p.author_name)}`}
+                            className={`user${userCls ? ` ${userCls}` : ""}`}
+                          >
+                            {display}
+                          </Link>
+                          {p.author_display_name ? (
+                            <span className="muted"> @{p.author_name}</span>
+                          ) : null}
                           {rank ? (
                             <>
                               {" "}
@@ -1099,6 +1127,46 @@ export default function ForumApp({
                           title={thread.title}
                           text={excerptBody(p.body, 120)}
                         />
+                        {me ? (
+                          <button
+                            type="button"
+                            className="mod-btn"
+                            title="reportar"
+                            onClick={async () => {
+                              const reason =
+                                window.prompt(
+                                  "motivo (spam|harassment|nsfw|other):",
+                                  "other"
+                                ) || "other";
+                              const details =
+                                window.prompt("detalles:") || "";
+                              try {
+                                const res = await fetch("/api/reports", {
+                                  method: "POST",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                    target_type: "forum_post",
+                                    target_id: p.id,
+                                    reason,
+                                    details,
+                                  }),
+                                });
+                                const d = await res.json();
+                                if (!res.ok) {
+                                  setError(d.error || "error reporte");
+                                } else {
+                                  alert("reporte enviado");
+                                }
+                              } catch {
+                                setError("red caída");
+                              }
+                            }}
+                          >
+                            [report]
+                          </button>
+                        ) : null}
                         {canDel ? (
                           <button
                             type="button"

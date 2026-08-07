@@ -1,9 +1,10 @@
-import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getSessionUser } from "@/lib/auth";
 
 /**
- * /forum es exclusivo para usuarios registrados (sesión activa).
- * Visitantes sin login → home.
+ * Foro: miembros ven la app completa.
+ * Guests pueden ver posts/hilos compartidos por enlace (páginas hijas).
+ * La UI de browse en ForumApp pide login si no hay sesión.
  */
 export default async function ForumLayout({
   children,
@@ -12,7 +13,20 @@ export default async function ForumLayout({
 }) {
   const user = await getSessionUser().catch(() => null);
   if (!user || user.banned) {
-    redirect("/");
+    return (
+      <div className="forum-guest-shell">
+        <div className="forum-guest-bar">
+          <span className="muted">vista guest · post compartido</span>
+          <span className="sep">|</span>
+          <Link href="/auth/login?next=/forum">login</Link>
+          <span className="sep">|</span>
+          <Link href="/auth/register">register</Link>
+          <span className="sep">|</span>
+          <Link href="/">home</Link>
+        </div>
+        {children}
+      </div>
+    );
   }
   return children;
 }

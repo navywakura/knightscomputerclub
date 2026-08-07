@@ -22,9 +22,17 @@ import NexoGifPicker from "@/components/nexo/NexoGifPicker";
 import VipThemePicker from "@/components/VipThemePicker";
 import WiredBootScreen, { WIRED_BOOT_MIN_MS } from "@/components/WiredBootScreen";
 import { nexoInviteUrl } from "@/lib/auth-redirect";
-import { canCreateNexoBoard, dmUnlockKey, NEXO_POLL_MS } from "@/lib/nexo";
+import {
+  canCreateNexoBoard,
+  canEditMessageByAge,
+  dmUnlockKey,
+  NEXO_GROUP_MS,
+  NEXO_POLL_HIDDEN_MS,
+  NEXO_POLL_MS,
+} from "@/lib/nexo";
 import { apiFetch, getStorage } from "@/lib/platform";
 import { getRank, rankNameClass } from "@/lib/ranks";
+import { useRouter } from "next/navigation";
 
 type Me = {
   id: number;
@@ -69,10 +77,15 @@ type Msg = {
   id: number;
   author_id: number;
   author_name: string;
+  author_display_name?: string | null;
   author_role?: string;
   author_is_vip?: boolean;
+  author_avatar_url?: string | null;
   body: string;
   created_at: string;
+  edited_at?: string | null;
+  deleted?: boolean;
+  expires_at?: string | null;
 };
 
 type DmThread = {
@@ -117,6 +130,11 @@ export default function NexoApp({
   const [incoming, setIncoming] = useState<FriendUser[]>([]);
   const [outgoing, setOutgoing] = useState<FriendUser[]>([]);
   const [friendUser, setFriendUser] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+  const [dmEphemeral, setDmEphemeral] = useState(0);
+  const serverTimeRef = useRef<string | null>(null);
+  const router = useRouter();
 
   // create board
   const [showCreate, setShowCreate] = useState(false);
@@ -182,28 +200,40 @@ export default function NexoApp({
     async (id: number, incremental = false) => {
       try {
         const after = incremental ? lastIdRef.current : 0;
-        const q = after
-          ? `?board=${id}&after=${after}`
-          : `?board=${id}`;
-        const res = await apiFetch(`/api/nexo/messages${q}`);
+        const params = new URLSearchParams({ board: String(id) });
+        if (after) {
+          params.set("after", String(after));
+          if (serverTimeRef.current) {
+            params.set("since", serverTimeRef.current);
+          }
+        }
+        const res = await apiFetch(`/api/nexo/messages?${params}`);
         const d = await res.json();
         if (!res.ok) throw new Error(d.error || "error");
+        if (d.server_time) serverTimeRef.current = String(d.server_time);
         const list = (d.messages || []) as Msg[];
-        if (incremental && list.length) {
+        const updates = (d.updates || []) as Msg[];
+        if (incremental) {
           setMessages((prev) => {
-            const ids = new Set(prev.map((m) => m.id));
-            const merged = [...prev];
-            for (const m of list) {
-              if (!ids.has(m.id)) merged.push(m);
+            let next = [...prev];
+            if (updates.length) {
+              const byId = new Map(updates.map((u) => [u.id, u]));
+              next = next.map((m) => byId.get(m.id) || m);
             }
-            return merged;
+            if (list.length) {
+              const ids = new Set(next.map((m) => m.id));
+              for (const m of list) {
+                if (!ids.has(m.id)) next.push(m);
+              }
+              lastIdRef.current = Math.max(
+                lastIdRef.current,
+                ...list.map((m) => m.id)
+              );
+              requestAnimationFrame(scrollBottom);
+            }
+            return next;
           });
-          lastIdRef.current = Math.max(
-            lastIdRef.current,
-            ...list.map((m) => m.id)
-          );
-          requestAnimationFrame(scrollBottom);
-        } else if (!incremental) {
+        } else {
           setMessages(list);
           lastIdRef.current = list.length
             ? list[list.length - 1].id
@@ -421,18 +451,41 @@ export default function NexoApp({
     }
   }
 
-  // poll board messages + members
+  // poll board messages + members (menos agresivo en background)
   useEffect(() => {
     if (tab !== "boards" || !boardId) return;
     void joinBoard(boardId);
     loadMessages(boardId, false);
     void loadMembers(boardId);
-    const iv = window.setInterval(() => {
+    let tick = 0;
+    const tickFn = () => {
       loadMessages(boardId, true);
-      void joinBoard(boardId);
-      void loadMembers(boardId);
-    }, NEXO_POLL_MS);
-    return () => window.clearInterval(iv);
+      tick += 1;
+      // heartbeat miembros cada ~4 polls
+      if (tick % 4 === 0) {
+        void joinBoard(boardId);
+        void loadMembers(boardId);
+      }
+    };
+    let iv = window.setInterval(
+      tickFn,
+      document.visibilityState === "visible" ? NEXO_POLL_MS : NEXO_POLL_HIDDEN_MS
+    );
+    const onVis = () => {
+      window.clearInterval(iv);
+      iv = window.setInterval(
+        tickFn,
+        document.visibilityState === "visible"
+          ? NEXO_POLL_MS
+          : NEXO_POLL_HIDDEN_MS
+      );
+      if (document.visibilityState === "visible") tickFn();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, [tab, boardId, loadMessages, joinBoard, loadMembers]);
 
   // poll DMs
@@ -441,11 +494,26 @@ export default function NexoApp({
     loadDmList();
     if (dmId && dmUnlocked) {
       loadDmMessages(dmId, false);
-      const iv = window.setInterval(
+      let iv = window.setInterval(
         () => loadDmMessages(dmId, true),
-        NEXO_POLL_MS
+        document.visibilityState === "visible"
+          ? NEXO_POLL_MS
+          : NEXO_POLL_HIDDEN_MS
       );
-      return () => window.clearInterval(iv);
+      const onVis = () => {
+        window.clearInterval(iv);
+        iv = window.setInterval(
+          () => loadDmMessages(dmId, true),
+          document.visibilityState === "visible"
+            ? NEXO_POLL_MS
+            : NEXO_POLL_HIDDEN_MS
+        );
+      };
+      document.addEventListener("visibilitychange", onVis);
+      return () => {
+        window.clearInterval(iv);
+        document.removeEventListener("visibilitychange", onVis);
+      };
     }
   }, [tab, dmId, dmUnlocked, loadDmList, loadDmMessages]);
 
@@ -688,12 +756,178 @@ export default function NexoApp({
     },
   ];
 
-  const msgCtx: ContextMenuItem[] = [
-    { id: "copy_msg", label: "copiar mensaje" },
-    { id: "mention", label: "mencionar…" },
-    { id: "friend", label: "solicitud de amistad…" },
-    { id: "dm_author", label: "DM al autor…" },
-  ];
+  function msgCtxFor(m: Msg): ContextMenuItem[] {
+    const mine = !!(me && m.author_id === me.id);
+    const canEdit = mine && !m.deleted && canEditMessageByAge(m.created_at);
+    return [
+      { id: "copy_msg", label: "copiar mensaje", disabled: !!m.deleted },
+      { id: "profile", label: "ver perfil" },
+      { id: "mention", label: "mencionar…" },
+      { id: "friend", label: "solicitud de amistad…" },
+      { id: "dm_author", label: "DM al autor…" },
+      { id: "sep_r", label: "", separator: true },
+      { id: "edit", label: "editar (≤10h)", disabled: !canEdit },
+      { id: "delete", label: "eliminar mensaje", disabled: !mine && tab === "dm" },
+      { id: "report", label: "reportar…" },
+    ];
+  }
+
+  async function reportTarget(
+    target_type: "nexo_message" | "nexo_dm" | "user",
+    target_id: number
+  ) {
+    const reason =
+      window.prompt(
+        "motivo (spam|harassment|nsfw|illegal|impersonation|other):",
+        "other"
+      ) || "other";
+    const details = window.prompt("detalles (opcional):") || "";
+    try {
+      const res = await apiFetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_type, target_id, reason, details }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error || "error al reportar");
+        return;
+      }
+      setError("");
+      alert("reporte enviado. gracias.");
+    } catch {
+      setError("red caída");
+    }
+  }
+
+  async function deleteMsg(m: Msg) {
+    if (!window.confirm("¿Eliminar este mensaje?")) return;
+    try {
+      if (tab === "boards") {
+        const res = await apiFetch("/api/nexo/messages", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: m.id, action: "delete" }),
+        });
+        const d = await res.json();
+        if (!res.ok) {
+          setError(d.error || "error");
+          return;
+        }
+        setMessages((prev) =>
+          prev.map((x) =>
+            x.id === m.id ? { ...x, deleted: true, body: "" } : x
+          )
+        );
+      } else {
+        const res = await apiFetch("/api/nexo/dm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "delete",
+            message_id: m.id,
+            pin: dmPin,
+          }),
+        });
+        const d = await res.json();
+        if (!res.ok) {
+          setError(d.error || "error");
+          return;
+        }
+        setDmMessages((prev) =>
+          prev.map((x) =>
+            x.id === m.id ? { ...x, deleted: true, body: "" } : x
+          )
+        );
+      }
+    } catch {
+      setError("red caída");
+    }
+  }
+
+  async function saveEdit(m: Msg) {
+    const text = editText.trim();
+    if (!text) return;
+    setSending(true);
+    try {
+      if (tab === "boards") {
+        const res = await apiFetch("/api/nexo/messages", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: m.id, action: "edit", body: text }),
+        });
+        const d = await res.json();
+        if (!res.ok) {
+          setError(d.error || "error");
+          return;
+        }
+        setMessages((prev) =>
+          prev.map((x) =>
+            x.id === m.id
+              ? {
+                  ...x,
+                  body: text,
+                  edited_at: new Date().toISOString(),
+                }
+              : x
+          )
+        );
+      } else {
+        const res = await apiFetch("/api/nexo/dm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "edit",
+            message_id: m.id,
+            body: text,
+            pin: dmPin,
+          }),
+        });
+        const d = await res.json();
+        if (!res.ok) {
+          setError(d.error || "error");
+          return;
+        }
+        setDmMessages((prev) =>
+          prev.map((x) =>
+            x.id === m.id
+              ? { ...x, body: text, edited_at: new Date().toISOString() }
+              : x
+          )
+        );
+      }
+      setEditingId(null);
+      setEditText("");
+    } catch {
+      setError("red caída");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function setEphemeral(minutes: number) {
+    if (!dmId || !dmPin) return;
+    try {
+      const res = await apiFetch("/api/nexo/dm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ephemeral",
+          thread_id: dmId,
+          pin: dmPin,
+          minutes,
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error || "error");
+        return;
+      }
+      setDmEphemeral(minutes);
+    } catch {
+      setError("red caída");
+    }
+  }
 
   if (loading) {
     return (
@@ -1077,7 +1311,7 @@ export default function NexoApp({
                 <span>elegí un tablón</span>
               )
             ) : dmId ? (
-              <span>
+              <span className="nexo-dm-head">
                 DM · @{dmPeer || "…"}{" "}
                 {dmUnlocked ? (
                   <span className="tag ok">unlocked</span>
@@ -1087,6 +1321,25 @@ export default function NexoApp({
                     locked
                   </span>
                 )}
+                {dmUnlocked ? (
+                  <label className="nexo-eph-label muted">
+                    efímero
+                    <select
+                      value={dmEphemeral}
+                      onChange={(e) =>
+                        void setEphemeral(Number(e.target.value))
+                      }
+                      title="mensajes se borran tras X minutos"
+                    >
+                      <option value={0}>off</option>
+                      <option value={5}>5 min</option>
+                      <option value={30}>30 min</option>
+                      <option value={60}>1 h</option>
+                      <option value={360}>6 h</option>
+                      <option value={1440}>24 h</option>
+                    </select>
+                  </label>
+                ) : null}
               </span>
             ) : (
               <span>elegí o abrí un DM</span>
@@ -1142,7 +1395,16 @@ export default function NexoApp({
                 ) : chatMsgs.length === 0 ? (
                   <p className="muted forum-pad">sin mensajes. escribí el primero.</p>
                 ) : (
-                  chatMsgs.map((m) => {
+                  chatMsgs.map((m, idx) => {
+                    const prev = idx > 0 ? chatMsgs[idx - 1] : null;
+                    const sameAuthor =
+                      prev &&
+                      prev.author_id === m.author_id &&
+                      !prev.deleted &&
+                      Date.parse(String(m.created_at)) -
+                        Date.parse(String(prev.created_at)) <
+                        NEXO_GROUP_MS;
+                    const showHead = !sameAuthor;
                     const rank = getRank({
                       role: m.author_role,
                       username: m.author_name,
@@ -1152,13 +1414,18 @@ export default function NexoApp({
                     const initials = (m.author_name || "?")
                       .replace(/^@/, "")
                       .slice(0, 2);
+                    const label =
+                      m.author_display_name?.trim() || m.author_name;
                     return (
                       <AppContextMenu
                         key={m.id}
-                        items={msgCtx}
+                        items={msgCtxFor(m)}
                         onSelect={(id) => {
                           if (id === "copy_msg") {
                             void navigator.clipboard?.writeText(m.body);
+                          }
+                          if (id === "profile") {
+                            router.push(`/u/${encodeURIComponent(m.author_name)}`);
                           }
                           if (id === "mention") {
                             setText((t) =>
@@ -1175,30 +1442,122 @@ export default function NexoApp({
                             setShowDmOpen(true);
                             setDmOpenUser(m.author_name);
                           }
+                          if (id === "edit") {
+                            setEditingId(m.id);
+                            setEditText(m.body);
+                          }
+                          if (id === "delete") void deleteMsg(m);
+                          if (id === "report") {
+                            void reportTarget(
+                              tab === "dm" ? "nexo_dm" : "nexo_message",
+                              m.id
+                            );
+                          }
                         }}
                       >
                         <article
-                          className={`nexo-msg${isMine ? " mine" : ""}`}
+                          className={`nexo-msg${isMine ? " mine" : ""}${
+                            showHead ? "" : " compact"
+                          }${m.deleted ? " deleted" : ""}`}
                         >
-                          <div className="nexo-msg-avatar" aria-hidden>
-                            {initials}
-                          </div>
+                          {showHead ? (
+                            <button
+                              type="button"
+                              className="nexo-msg-avatar"
+                              title={`@${m.author_name}`}
+                              onClick={() =>
+                                router.push(
+                                  `/u/${encodeURIComponent(m.author_name)}`
+                                )
+                              }
+                            >
+                              {m.author_avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={m.author_avatar_url} alt="" />
+                              ) : (
+                                <span>{initials}</span>
+                              )}
+                            </button>
+                          ) : (
+                            <div className="nexo-msg-avatar spacer" aria-hidden />
+                          )}
                           <div className="nexo-msg-content">
-                            <header className="nexo-msg-meta">
-                              <span
-                                className={`nexo-msg-user ${rankNameClass(rank) || ""}`.trim()}
-                              >
-                                @{m.author_name}
-                              </span>
-                              {rank ? <RankBadge rank={rank} /> : null}
-                              <span className="nexo-msg-time">
-                                {new Date(m.created_at).toLocaleString()}
-                              </span>
-                            </header>
-                            <NexoChatBody
-                              body={m.body}
-                              myUsername={me?.username}
-                            />
+                            {showHead ? (
+                              <header className="nexo-msg-meta">
+                                <button
+                                  type="button"
+                                  className={`nexo-msg-user linkish ${rankNameClass(rank) || ""}`.trim()}
+                                  onClick={() =>
+                                    router.push(
+                                      `/u/${encodeURIComponent(m.author_name)}`
+                                    )
+                                  }
+                                >
+                                  {label}
+                                </button>
+                                {m.author_display_name ? (
+                                  <span className="muted nexo-msg-handle">
+                                    @{m.author_name}
+                                  </span>
+                                ) : null}
+                                {rank ? <RankBadge rank={rank} /> : null}
+                                <span className="nexo-msg-time">
+                                  {new Date(m.created_at).toLocaleString()}
+                                </span>
+                              </header>
+                            ) : null}
+                            {editingId === m.id ? (
+                              <div className="nexo-edit-box">
+                                <textarea
+                                  value={editText}
+                                  onChange={(e) => setEditText(e.target.value)}
+                                  rows={3}
+                                  maxLength={4000}
+                                />
+                                <div className="settings-inline">
+                                  <button
+                                    type="button"
+                                    className="btn"
+                                    disabled={sending}
+                                    onClick={() => void saveEdit(m)}
+                                  >
+                                    guardar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn secondary"
+                                    onClick={() => {
+                                      setEditingId(null);
+                                      setEditText("");
+                                    }}
+                                  >
+                                    cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : m.deleted ? (
+                              <div className="nexo-msg-body deleted-body">
+                                <em>mensaje eliminado</em>
+                              </div>
+                            ) : (
+                              <>
+                                <NexoChatBody
+                                  body={m.body}
+                                  myUsername={me?.username}
+                                />
+                                {m.edited_at ? (
+                                  <span className="nexo-msg-edited muted">
+                                    (editado)
+                                  </span>
+                                ) : null}
+                                {m.expires_at ? (
+                                  <span className="nexo-msg-eph muted">
+                                    ⏳ expira{" "}
+                                    {new Date(m.expires_at).toLocaleTimeString()}
+                                  </span>
+                                ) : null}
+                              </>
+                            )}
                           </div>
                         </article>
                       </AppContextMenu>

@@ -360,9 +360,62 @@ export async function ensureSchema() {
     ALTER TABLE nexo_dm_messages
     ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   `;
+  // DMs efímeros: TTL por thread (minutos; 0 = off) + expires_at por mensaje
+  await db`
+    ALTER TABLE nexo_dm_threads
+    ADD COLUMN IF NOT EXISTS ephemeral_minutes INT NOT NULL DEFAULT 0
+  `;
+  await db`
+    ALTER TABLE nexo_dm_messages
+    ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ
+  `;
+
+  // PGP en perfiles
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS pgp_public_key TEXT
+  `;
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS pgp_fingerprint VARCHAR(64)
+  `;
+
+  // Reportes (forum / nexo / dm)
+  await db`
+    CREATE TABLE IF NOT EXISTS reports (
+      id SERIAL PRIMARY KEY,
+      reporter_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      target_type VARCHAR(24) NOT NULL,
+      target_id INT NOT NULL,
+      reason VARCHAR(64) NOT NULL DEFAULT 'other',
+      details TEXT NOT NULL DEFAULT '',
+      status VARCHAR(16) NOT NULL DEFAULT 'open',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CHECK (target_type IN ('forum_post', 'forum_thread', 'nexo_message', 'nexo_dm', 'user')),
+      CHECK (status IN ('open', 'reviewed', 'dismissed'))
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_reports_status
+      ON reports (status, created_at DESC)
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_reports_target
+      ON reports (target_type, target_id)
+  `;
 
   // Seed / upsert categorías (incluye jerarquía offtopic + nexo)
   await seedCategories(db);
+
+  // Purga mensajes DM efímeros vencidos
+  try {
+    await db`
+      DELETE FROM nexo_dm_messages
+      WHERE expires_at IS NOT NULL AND expires_at < NOW()
+    `;
+  } catch {
+    /* */
+  }
 
   // Purga soft-deletes vencidos
   try {
