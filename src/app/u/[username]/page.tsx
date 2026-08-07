@@ -8,6 +8,7 @@ import ProfileMusicPlayer from "@/components/ProfileMusicPlayer";
 import { ensureSchema, getDb } from "@/lib/db";
 import { parseConnections } from "@/lib/auth";
 import { getRank, rankNameClass } from "@/lib/ranks";
+import { excerptBody } from "@/lib/markdown";
 import {
   getProfileTheme,
   profileThemeStyle,
@@ -41,6 +42,39 @@ async function loadUser(username: string) {
     return rows[0] || null;
   } catch {
     return null;
+  }
+}
+
+async function loadUserPosts(userId: number) {
+  try {
+    const db = getDb();
+    const rows = await db`
+      SELECT
+        p.id,
+        p.body,
+        p.created_at,
+        p.thread_id,
+        t.title AS thread_title,
+        c.slug AS category_slug,
+        c.name AS category_name
+      FROM posts p
+      JOIN threads t ON t.id = p.thread_id
+      JOIN categories c ON c.id = t.category_id
+      WHERE p.author_id = ${userId}
+      ORDER BY p.created_at DESC
+      LIMIT 40
+    `;
+    return rows as Array<{
+      id: number;
+      body: string;
+      created_at: string;
+      thread_id: number;
+      thread_title: string;
+      category_slug: string;
+      category_name: string;
+    }>;
+  } catch {
+    return [];
   }
 }
 
@@ -124,6 +158,7 @@ export default async function PublicProfilePage({ params }: Props) {
   const custom = parseProfileCustom(u.profile_custom);
   const customCss = buildProfileCustomCss(String(u.username), custom);
   const handle = String(u.username);
+  const posts = await loadUserPosts(Number(u.id));
 
   return (
     <main
@@ -138,10 +173,8 @@ export default async function PublicProfilePage({ params }: Props) {
           data-profile-custom=""
         />
       ) : null}
-      {/* fondo full-page del tema */}
       <div className="profile-theme-bg" aria-hidden />
 
-      {/* decoraciones (fotos de internet) */}
       {theme.decors[0] ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -162,115 +195,181 @@ export default async function PublicProfilePage({ params }: Props) {
       {musicUrl ? (
         <ProfileMusicPlayer
           src={musicUrl}
-          label={`@${String(u.username)} · soundtrack`}
+          label={`@${handle} · soundtrack`}
         />
       ) : null}
 
-      <div
-        className="profile-public-banner"
-        style={{ backgroundImage: `url(${bannerUrl})` }}
-      />
-      <div className="profile-public-card">
-        <div className="profile-public-av">
-          {avatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatar} alt="" />
-          ) : (
-            <span>{String(u.username).slice(0, 2)}</span>
-          )}
-        </div>
-        <div className="profile-public-heading">
-          <h1 className="profile-public-name">
-            <span className={rankNameClass(rank) || ""}>{display}</span>{" "}
-            {rank ? <RankBadge rank={rank} /> : null}
-          </h1>
-          <ShareButton
-            path={`/u/${encodeURIComponent(String(u.username))}`}
-            title={`@${String(u.username)} · knightscomputer.club`}
-            text={
-              u.bio
-                ? `${display} (@${String(u.username)}) — ${String(u.bio)}`
-                : `Perfil de @${String(u.username)} en knightscomputer.club`
-            }
-            label="[ compartir perfil ]"
-            className="profile-share-btn"
-          />
-        </div>
-        <p className="profile-public-meta">
-          @{String(u.username)} · miembro desde{" "}
-          {new Date(String(u.created_at)).toLocaleDateString()}
-          <span className="profile-theme-badge"> · tema: {theme.name}</span>
-        </p>
-        {u.bio ? <p className="profile-public-bio">{String(u.bio)}</p> : null}
-
-        {Object.keys(conns).length > 0 ? (
-          <div className="profile-public-links">
-            {conns.github ? (
-              <a href={conns.github} target="_blank" rel="noopener noreferrer">
-                GitHub
-              </a>
-            ) : null}
-            {conns.twitter ? (
-              <a href={conns.twitter} target="_blank" rel="noopener noreferrer">
-                X
-              </a>
-            ) : null}
-            {conns.website ? (
-              <a href={conns.website} target="_blank" rel="noopener noreferrer">
-                web
-              </a>
-            ) : null}
-            {conns.discord ? (
-              <span className="profile-public-meta">
-                discord: {conns.discord}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-
-        {fp || pub ? (
-          <section className="profile-public-pgp">
-            <h2>PGP</h2>
-            {fp ? (
-              <p className="profile-public-meta" style={{ fontSize: "0.85rem" }}>
-                fingerprint: <code>{fp}</code>
-              </p>
-            ) : null}
-            {pub ? (
-              <pre className="profile-pgp-block">{pub}</pre>
-            ) : null}
-          </section>
-        ) : null}
-
+      {/* banner + card pegados */}
+      <div className="profile-public-shell">
         <div
-          className="compose-toolbar profile-public-actions"
-          style={{ marginTop: 16 }}
-        >
-          <ShareButton
-            path={`/u/${encodeURIComponent(String(u.username))}`}
-            title={`@${String(u.username)} · knightscomputer.club`}
-            text={
-              u.bio
-                ? `${display} (@${String(u.username)}) — ${String(u.bio)}`
-                : `Perfil de @${String(u.username)} en knightscomputer.club`
-            }
-            label="[ compartir ]"
-            className="btn secondary"
-          />
-          <Link
-            href={`/nexo?dm_user=${encodeURIComponent(String(u.username))}`}
-            className="btn"
-          >
-            [ DM en nexo ]
-          </Link>
-          <Link href="/forum" className="btn secondary">
-            [ foro ]
-          </Link>
-          <Link href="/" className="btn secondary">
-            [ home ]
-          </Link>
+          className="profile-public-banner"
+          style={{ backgroundImage: `url(${bannerUrl})` }}
+        />
+        <div className="profile-public-card">
+          <div className="profile-public-av">
+            {avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatar} alt="" />
+            ) : (
+              <span>{handle.slice(0, 2)}</span>
+            )}
+          </div>
+          <div className="profile-public-heading">
+            <h1 className="profile-public-name">
+              <span className={rankNameClass(rank) || ""}>{display}</span>{" "}
+              {rank ? <RankBadge rank={rank} /> : null}
+            </h1>
+            <ShareButton
+              path={`/u/${encodeURIComponent(handle)}`}
+              title={`@${handle} · knightscomputer.club`}
+              text={
+                u.bio
+                  ? `${display} (@${handle}) — ${String(u.bio)}`
+                  : `Perfil de @${handle} en knightscomputer.club`
+              }
+              label="[ compartir perfil ]"
+              className="profile-share-btn"
+            />
+          </div>
+          <p className="profile-public-meta">
+            @{handle} · miembro desde{" "}
+            {new Date(String(u.created_at)).toLocaleDateString()}
+            <span className="profile-theme-badge"> · tema: {theme.name}</span>
+          </p>
+          {u.bio ? (
+            <p className="profile-public-bio">{String(u.bio)}</p>
+          ) : null}
+
+          {Object.keys(conns).length > 0 ? (
+            <div className="profile-public-links">
+              {conns.github ? (
+                <a
+                  href={conns.github}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  GitHub
+                </a>
+              ) : null}
+              {conns.twitter ? (
+                <a
+                  href={conns.twitter}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  X
+                </a>
+              ) : null}
+              {conns.website ? (
+                <a
+                  href={conns.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  web
+                </a>
+              ) : null}
+              {conns.discord ? (
+                <span className="profile-public-meta">
+                  discord: {conns.discord}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          {fp || pub ? (
+            <section className="profile-public-pgp">
+              <h2>PGP</h2>
+              {fp ? (
+                <p
+                  className="profile-public-meta"
+                  style={{ fontSize: "0.85rem" }}
+                >
+                  fingerprint: <code>{fp}</code>
+                </p>
+              ) : null}
+              {pub ? <pre className="profile-pgp-block">{pub}</pre> : null}
+            </section>
+          ) : null}
+
+          <div className="compose-toolbar profile-public-actions">
+            <ShareButton
+              path={`/u/${encodeURIComponent(handle)}`}
+              title={`@${handle} · knightscomputer.club`}
+              text={
+                u.bio
+                  ? `${display} (@${handle}) — ${String(u.bio)}`
+                  : `Perfil de @${handle} en knightscomputer.club`
+              }
+              label="[ compartir ]"
+              className="btn secondary"
+            />
+            <Link
+              href={`/nexo?dm_user=${encodeURIComponent(handle)}`}
+              className="btn"
+            >
+              [ DM en nexo ]
+            </Link>
+            <Link href="/forum" className="btn secondary">
+              [ foro ]
+            </Link>
+            <Link href="/" className="btn secondary">
+              [ home ]
+            </Link>
+          </div>
         </div>
       </div>
+
+      {/* feed de posts del usuario */}
+      <section className="profile-feed" aria-label="publicaciones">
+        <h2 className="profile-feed-title">
+          publicaciones{" "}
+          <span className="profile-public-meta">
+            ({posts.length}
+            {posts.length >= 40 ? "+" : ""})
+          </span>
+        </h2>
+        {posts.length === 0 ? (
+          <p className="profile-public-meta profile-feed-empty">
+            todavía no hay posts en el foro de este usuario.
+          </p>
+        ) : (
+          <ul className="profile-feed-list">
+            {posts.map((p) => {
+              const excerpt = excerptBody(String(p.body || ""), 220);
+              const when = new Date(String(p.created_at)).toLocaleString();
+              return (
+                <li key={p.id} className="profile-feed-item">
+                  <div className="profile-feed-item-head">
+                    <Link
+                      href={`/forum/thread/${p.thread_id}`}
+                      className="profile-feed-thread"
+                    >
+                      {String(p.thread_title)}
+                    </Link>
+                    <span className="profile-feed-meta">
+                      <Link href={`/forum/${p.category_slug}`}>
+                        {String(p.category_name)}
+                      </Link>
+                      {" · "}
+                      {when}
+                    </span>
+                  </div>
+                  <p className="profile-feed-excerpt">{excerpt || "…"}</p>
+                  <div className="profile-feed-item-foot">
+                    <Link
+                      href={`/forum/post/${p.id}`}
+                      className="profile-feed-open"
+                    >
+                      ver post →
+                    </Link>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
     </main>
   );
 }
