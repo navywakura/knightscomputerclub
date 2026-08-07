@@ -170,7 +170,8 @@ export default async function PublicProfilePage({ params }: Props) {
     themeStyle["--pt-bg-image"] = `url(${pageBgUrl})`;
   }
   const custom = parseProfileCustom(u.profile_custom);
-  // CSS de montañas base para navywakura (colores fríos + banner)
+  // Fondo de página (full page) ≠ banner del card (VIP o tema).
+  // Nunca pisar .profile-public-banner con el fondo personalizado.
   let customCss = buildProfileCustomCss(String(u.username), custom);
   if (
     String(u.username).toLowerCase() === "navywakura" &&
@@ -185,13 +186,6 @@ export default async function PublicProfilePage({ params }: Props) {
   background-size: cover !important;
   background-position: center 40% !important;
 }
-.profile-public-banner {
-  background-image:
-    linear-gradient(180deg, transparent 20%, rgba(8,12,22,0.75)),
-    url("${pageBgUrl}") !important;
-  background-size: cover !important;
-  background-position: center 35% !important;
-}
 .profile-public-shell,
 .profile-feed {
   background: rgba(12, 16, 28, 0.88) !important;
@@ -204,19 +198,11 @@ export default async function PublicProfilePage({ params }: Props) {
 `.trim();
     customCss = [customCss, mountains].filter(Boolean).join("\n");
   } else if (pageBgUrl && !custom.css) {
-    // cualquier user con fondo custom: aplicar cover
     customCss = [
       customCss,
       `.profile-theme-bg {
   background-image:
     linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.78) 100%),
-    url("${pageBgUrl}") !important;
-  background-size: cover !important;
-  background-position: center !important;
-}
-.profile-public-banner {
-  background-image:
-    linear-gradient(180deg, transparent 25%, rgba(0,0,0,0.7)),
     url("${pageBgUrl}") !important;
   background-size: cover !important;
   background-position: center !important;
