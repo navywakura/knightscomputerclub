@@ -139,15 +139,38 @@ export default function SettingsApp({ initialTab = "profile" }: Props) {
   }, []);
 
   async function uploadMedia(file: File): Promise<number | null> {
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch("/api/media", { method: "POST", body: form });
-    const d = await res.json();
-    if (!res.ok) {
-      setError(d.error || "error al subir");
+    if (!file.type.startsWith("image/")) {
+      setError("solo imágenes (jpeg/png/webp/gif)");
       return null;
     }
-    return Number(d.id);
+    if (file.size > 8 * 1024 * 1024) {
+      setError("imagen > 8MB");
+      return null;
+    }
+    const form = new FormData();
+    form.append("file", file, file.name || "photo.jpg");
+    const res = await fetch("/api/media", {
+      method: "POST",
+      body: form,
+      credentials: "include",
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = String(d.error || "error al subir");
+      // mensajes más claros para el usuario
+      if (d.code === "nsfw_blocked") {
+        setError(`moderación: ${msg}`);
+      } else {
+        setError(msg);
+      }
+      return null;
+    }
+    const id = Number(d.id);
+    if (!Number.isFinite(id)) {
+      setError("respuesta de upload inválida");
+      return null;
+    }
+    return id;
   }
 
   async function onAvatarPick(file: File | null) {

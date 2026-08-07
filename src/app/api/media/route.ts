@@ -94,17 +94,23 @@ export async function POST(req: Request) {
       }
       mime = PDF_TYPE;
     } else {
-      // Automoderación NSFW solo imágenes
-      const mod = await moderateImageBuffer(buf, mime);
-      if (!mod.allowed) {
-        return NextResponse.json(
-          {
-            error: mod.reason || "imagen bloqueada por moderación NSFW",
-            code: "nsfw_blocked",
-            labels: mod.labels || [],
-          },
-          { status: 422 }
-        );
+      // Automoderación NSFW solo imágenes (fail-open si no hay key / API caída)
+      try {
+        const mod = await moderateImageBuffer(buf, mime);
+        if (!mod.allowed) {
+          return NextResponse.json(
+            {
+              error: mod.reason || "imagen bloqueada por moderación NSFW",
+              code: "nsfw_blocked",
+              labels: mod.labels || [],
+              provider: mod.provider,
+            },
+            { status: 422 }
+          );
+        }
+      } catch (modErr) {
+        // Nunca tumbar avatar/banner por un throw inesperado del moderador
+        console.error("[media] nsfw throw — allow", modErr);
       }
     }
 
