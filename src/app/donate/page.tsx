@@ -3,23 +3,24 @@ import Link from "next/link";
 import Panel from "@/components/Panel";
 import CopyButton from "@/components/CopyButton";
 import { getDonationChannels } from "@/lib/donations";
+import { FORUM_THEMES, VIP_PERKS } from "@/lib/forum-themes";
 
 export const metadata: Metadata = {
   title: "donar",
   description:
-    "Apoyá el nodo y RXos: PayPal, Ko-fi, Bitcoin, Solana y USDT. Donantes verificados reciben rango VIP en el foro.",
+    "Apoyá el nodo y RXos: PayPal, Ko-fi, Bitcoin, Solana y USDT. Donantes verificados reciben rango VIP: badge, temas del foro y más.",
   alternates: { canonical: "/donate" },
   openGraph: {
     title: "Donar · knightscomputer.club",
     description:
-      "Canales de donación fiat y crypto para el nodo y el desarrollo de RXos.",
+      "Canales de donación fiat y crypto. VIP: temas del foro, badge oro y reconocimiento.",
     url: "/donate",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Donar · knightscomputer.club",
-    description: "PayPal, Ko-fi, BTC, SOL, USDT — financiá el nodo.",
+    description: "PayPal, Ko-fi, BTC, SOL, USDT — financiá el nodo · perk VIP.",
   },
   keywords: [
     "donar",
@@ -29,12 +30,14 @@ export const metadata: Metadata = {
     "paypal",
     "ko-fi",
     "RXos",
+    "VIP",
     "knightscomputer",
   ],
 };
 
 export default function DonatePage() {
   const channels = getDonationChannels();
+  const themeSkins = FORUM_THEMES.filter((t) => t.id !== "default");
 
   return (
     <>
@@ -50,14 +53,55 @@ export default function DonatePage() {
           <span className="vip-badge" data-text="[VIP]">
             [VIP]
           </span>{" "}
-          en el foro: handle en oro eléctrico. Tras donar, avisá en{" "}
-          <Link href="/forum/ops">// ops-infra</Link> con tu username +
+          en el foro: handle en oro eléctrico + perks (abajo). Tras donar,
+          avisá en <Link href="/forum/ops">// ops-infra</Link> con tu username +
           comprobante (tx / captura).
         </p>
         <div className="btn-row">
           <Link href="/forum/ops" className="btn secondary">
             [ debatir uso de fondos → // ops-infra ]
           </Link>
+        </div>
+      </Panel>
+
+      <Panel title="~/donate · vip.perks">
+        <h2>
+          rango{" "}
+          <span className="vip-badge" data-text="[VIP]">
+            [VIP]
+          </span>{" "}
+          — ventajas
+        </h2>
+        <p className="muted">
+          No es pay-to-win del kernel. Es cosmética, reconocimiento y skins del
+          foro. El código sigue libre.
+        </p>
+        <ul className="vip-perks-list">
+          {VIP_PERKS.map((p) => (
+            <li key={p.title} className="vip-perk">
+              <strong>{p.title}</strong>
+              <p>{p.body}</p>
+            </li>
+          ))}
+        </ul>
+
+        <h3 style={{ marginTop: 16, marginBottom: 6 }}>
+          skins del foro (VIP)
+        </h3>
+        <p className="muted" style={{ marginTop: 0 }}>
+          En <Link href="/forum">/forum</Link> → botón{" "}
+          <code>theme</code> (solo VIP / owner):
+        </p>
+        <div className="vip-theme-previews">
+          {themeSkins.map((t) => (
+            <div key={t.id} className="vip-theme-preview">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={t.thumb || ""} alt={t.label} loading="lazy" />
+              <span>
+                {t.label} · {t.accent}
+              </span>
+            </div>
+          ))}
         </div>
       </Panel>
 
