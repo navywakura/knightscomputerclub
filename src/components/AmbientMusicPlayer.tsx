@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { playlistForPath, type Track } from "@/lib/playlists";
 
 const VOL_KEY = "kc_muzak_vol";
@@ -9,12 +9,12 @@ const MUTE_KEY = "kc_muzak_muted";
 
 /**
  * Mini reproductor global.
- * HOME → reproductormp3/playlist_para_home.
- * /forum y /donate → reproductormp3/playlist_para_forum_y_donate.
+ * HOME (/) → /reproductormp3/playlist_para_home
+ * /forum y /donate → /reproductormp3/playlist_para_forum_y_donate
  */
 export default function AmbientMusicPlayer() {
   const path = usePathname() || "/";
-  const playlist = playlistForPath(path);
+  const playlist = useMemo(() => playlistForPath(path), [path]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -24,10 +24,12 @@ export default function AmbientMusicPlayer() {
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const wasPlaying = useRef(false);
-  const playlistIdRef = useRef(playlist.id);
+  const playlistIdRef = useRef<string | null>(null);
 
-  const track: Track =
-    playlist.tracks[index % playlist.tracks.length] || playlist.tracks[0];
+  const safeIndex = playlist.tracks.length
+    ? index % playlist.tracks.length
+    : 0;
+  const track: Track | undefined = playlist.tracks[safeIndex];
 
   // zona body class (solo home cambia estética)
   useEffect(() => {
@@ -58,42 +60,66 @@ export default function AmbientMusicPlayer() {
     a.muted = muted;
   }, [volume, muted]);
 
-  // cambio de playlist al navegar
+  // cambio de playlist al navegar entre zonas (home ↔ forum/donate)
   useEffect(() => {
-    if (playlistIdRef.current === playlist.id) return;
-    playlistIdRef.current = playlist.id;
-    const keep = wasPlaying.current || playing;
-    setIndex(0);
-    setProgress(0);
     const a = audioRef.current;
     if (!a) return;
+
+    if (playlistIdRef.current === playlist.id) return;
+    playlistIdRef.current = playlist.id;
+
+    const keep = wasPlaying.current || playing;
+    const first = playlist.tracks[0];
+    setIndex(0);
+    setProgress(0);
+    setDuration(0);
+
     a.pause();
-    a.src = playlist.tracks[0]?.src || "";
+    a.removeAttribute("data-src");
+    a.removeAttribute("src");
     a.load();
+
+    if (!first) {
+      setPlaying(false);
+      return;
+    }
+
+    a.src = first.src;
+    a.setAttribute("data-src", first.src);
+    a.load();
+
     if (keep) {
       a.play()
-        .then(() => setPlaying(true))
+        .then(() => {
+          setPlaying(true);
+          wasPlaying.current = true;
+        })
         .catch(() => setPlaying(false));
     } else {
       setPlaying(false);
     }
-  }, [playlist.id, playlist.tracks, playing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar de playlist
+  }, [playlist.id, playlist.tracks]);
 
   // load track when index changes within same playlist
   useEffect(() => {
     const a = audioRef.current;
     if (!a || !track) return;
+    if (playlistIdRef.current !== playlist.id) return;
     if (a.getAttribute("data-src") === track.src) return;
+
     const resume = wasPlaying.current || playing;
     a.setAttribute("data-src", track.src);
     a.src = track.src;
     a.load();
+    setProgress(0);
+
     if (resume) {
       a.play()
         .then(() => setPlaying(true))
         .catch(() => setPlaying(false));
     }
-  }, [track, playing]);
+  }, [track, playlist.id, playing]);
 
   const next = useCallback(() => {
     setIndex((i) => (i + 1) % Math.max(playlist.tracks.length, 1));
@@ -117,9 +143,10 @@ export default function AmbientMusicPlayer() {
       return;
     }
     try {
-      if (!a.src && track) {
+      if (!a.getAttribute("data-src") && track) {
         a.src = track.src;
         a.setAttribute("data-src", track.src);
+        a.load();
       }
       await a.play();
       setPlaying(true);
@@ -187,6 +214,15 @@ export default function AmbientMusicPlayer() {
         preload="metadata"
         onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+        onError={() => {
+          // si un track falla (p.ej. codec), saltar al siguiente
+          if (playlist.tracks.length > 1) {
+            wasPlaying.current = playing;
+            next();
+          } else {
+            setPlaying(false);
+          }
+        }}
         onEnded={() => {
           wasPlaying.current = true;
           next();
@@ -280,7 +316,7 @@ export default function AmbientMusicPlayer() {
                 <li key={t.id}>
                   <button
                     type="button"
-                    className={i === index % playlist.tracks.length ? "on" : ""}
+                    className={i === safeIndex ? "on" : ""}
                     onClick={() => {
                       wasPlaying.current = true;
                       setIndex(i);
@@ -293,7 +329,9 @@ export default function AmbientMusicPlayer() {
               ))}
             </ol>
             <p className="muzak-credit">
-              non-copyright elevator / lounge jazz · {playlist.zone}
+              {isHome
+                ? "elevator / lounge muzak · playlist_para_home"
+                : "ops signal · playlist_para_forum_y_donate"}
             </p>
           </div>
         ) : null}

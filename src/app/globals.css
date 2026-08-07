@@ -1869,13 +1869,26 @@ body.zone-home {
   --border: #6a5a40;
   --border-bright: #c9b896;
   --scanline: rgba(212, 184, 120, 0.025);
-  --crt-vignette: rgba(20, 12, 6, 0.45);
-  background: var(--bg-deep);
+  --crt-vignette: rgba(20, 12, 6, 0.55);
+  /* elevador industrial (pexels → lobby-elevator.jpg) */
+  background-color: #14110e;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(18, 14, 10, 0.72) 0%,
+      rgba(14, 11, 8, 0.78) 45%,
+      rgba(10, 8, 6, 0.88) 100%
+    ),
+    url("/lobby-elevator.jpg");
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--text);
 }
 
 body.zone-home::before {
-  opacity: 0.35;
+  opacity: 0.28;
   background: repeating-linear-gradient(
     0deg,
     transparent,
@@ -1888,13 +1901,13 @@ body.zone-home::before {
 body.zone-home::after {
   background:
     radial-gradient(
-      ellipse at 50% 20%,
-      rgba(212, 184, 120, 0.08) 0%,
-      transparent 55%
+      ellipse at 50% 18%,
+      rgba(212, 184, 120, 0.1) 0%,
+      transparent 50%
     ),
     radial-gradient(
       ellipse at center,
-      transparent 45%,
+      transparent 40%,
       var(--crt-vignette) 100%
     );
 }

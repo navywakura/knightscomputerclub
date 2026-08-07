@@ -16,7 +16,10 @@ export type Playlist = {
   tracks: Track[];
 };
 
+/** Solo lobby (ruta /) */
 const HOME_DIR = "/reproductormp3/playlist_para_home";
+
+/** Foro + donate exclusivamente */
 const OPS_DIR = "/reproductormp3/playlist_para_forum_y_donate";
 
 /** Elevador / sala de espera / lobby — solo HOME */
@@ -58,32 +61,46 @@ export const HOME_PLAYLIST: Playlist = {
   ],
 };
 
-/** Foro + donate */
+/**
+ * Foro + donate — tracks de public/reproductormp3/playlist_para_forum_y_donate
+ * (AAC/M4A; no reutilizar tracks del lobby)
+ */
 export const OPS_PLAYLIST: Playlist = {
   id: "ops",
-  label: "NODE JAZZ",
-  zone: "forum · donate",
+  label: "NODE SIGNAL",
+  zone: "forum · donate · playlist_para_forum_y_donate",
   tracks: [
     {
       id: "longnight",
       title: "LONGNIGHT",
-      artist: "playlist",
+      artist: "ops",
       src: `${OPS_DIR}/LONGNIGHT.m4a`,
     },
     {
       id: "spacetrip",
       title: "SPACETRIP",
-      artist: "playlist",
+      artist: "ops",
       src: `${OPS_DIR}/SPACETRIP.m4a`,
     },
   ],
 };
 
-/** home → lobby; forum + donate → ops; resto → ops */
+/** true si la ruta usa la playlist de forum/donate */
+export function isOpsPath(pathname: string): boolean {
+  const p = pathname || "/";
+  return (
+    p === "/donate" ||
+    p.startsWith("/donate/") ||
+    p === "/forum" ||
+    p.startsWith("/forum/")
+  );
+}
+
+/** home → lobby; /forum y /donate → ops; resto (auth/admin) → ops */
 export function playlistForPath(pathname: string): Playlist {
-  if (pathname === "/" || pathname === "") return HOME_PLAYLIST;
-  if (pathname.startsWith("/forum") || pathname.startsWith("/donate")) {
-    return OPS_PLAYLIST;
-  }
+  const p = pathname || "/";
+  if (p === "/" || p === "") return HOME_PLAYLIST;
+  if (isOpsPath(p)) return OPS_PLAYLIST;
+  // login / register / admin: misma señal del nodo (ops)
   return OPS_PLAYLIST;
 }
