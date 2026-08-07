@@ -83,7 +83,7 @@ export async function getSessionUser(): Promise<PublicUser | null> {
       SELECT
         id, username, email, role, is_vip, banned, created_at,
         display_name, avatar_media_id, banner_media_id, dm_privacy, bio,
-        profile_theme, profile_music_media_id, profile_custom,
+        profile_theme, profile_music_media_id, profile_bg_media_id, profile_custom,
         email_verified, deleted_at, connections
       FROM users
       WHERE id = ${id}
@@ -98,6 +98,7 @@ export async function getSessionUser(): Promise<PublicUser | null> {
       bio: string | null;
       profile_theme: string | null;
       profile_music_media_id: number | null;
+      profile_bg_media_id: number | null;
       profile_custom: unknown;
       email_verified: boolean;
       deleted_at: string | null;
@@ -132,6 +133,7 @@ export async function getSessionUser(): Promise<PublicUser | null> {
       bio: u.bio,
       profile_theme: u.profile_theme,
       profile_music_media_id: u.profile_music_media_id,
+      profile_bg_media_id: u.profile_bg_media_id,
       profile_custom: u.profile_custom,
       email_verified: Boolean(u.email_verified),
       deleted_at: u.deleted_at,
@@ -201,6 +203,9 @@ export function toPublicUser(row: UserRow): PublicUser {
       : "matrix",
     profile_music_url: row.profile_music_media_id
       ? `/api/media/${row.profile_music_media_id}`
+      : null,
+    profile_bg_url: row.profile_bg_media_id
+      ? `/api/media/${row.profile_bg_media_id}`
       : null,
     profile_custom: parseProfileCustom(row.profile_custom),
     connections: parseConnections(row.connections),

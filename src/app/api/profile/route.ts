@@ -221,6 +221,50 @@ export async function PATCH(req: Request) {
       }
     }
 
+    if ("profile_bg_media_id" in body) {
+      const mid =
+        body.profile_bg_media_id === null || body.profile_bg_media_id === ""
+          ? null
+          : Number(body.profile_bg_media_id);
+      if (mid !== null) {
+        if (!Number.isFinite(mid)) {
+          return NextResponse.json(
+            { error: "profile_bg_media_id inválido" },
+            { status: 400 }
+          );
+        }
+        const media = await db`
+          SELECT id, mime FROM media
+          WHERE id = ${mid} AND uploader_id = ${user.id}
+          LIMIT 1
+        `;
+        if (!media[0]) {
+          return NextResponse.json(
+            { error: "fondo no encontrado o no es tuyo" },
+            { status: 404 }
+          );
+        }
+        const m = String(media[0].mime || "");
+        if (!m.startsWith("image/")) {
+          return NextResponse.json(
+            { error: "fondo: debe ser imagen (jpeg/png/webp/gif)" },
+            { status: 400 }
+          );
+        }
+        await db`
+          UPDATE users
+          SET profile_bg_media_id = ${mid}
+          WHERE id = ${user.id}
+        `;
+      } else {
+        await db`
+          UPDATE users
+          SET profile_bg_media_id = NULL
+          WHERE id = ${user.id}
+        `;
+      }
+    }
+
     if ("dm_privacy" in body) {
       const p = String(body.dm_privacy || "everyone");
       if (p !== "everyone" && p !== "friends") {
@@ -365,7 +409,7 @@ export async function PATCH(req: Request) {
       SELECT
         id, username, email, password_hash, role, is_vip, banned, created_at,
         display_name, avatar_media_id, banner_media_id, dm_privacy, bio,
-        profile_theme, profile_music_media_id, profile_custom,
+        profile_theme, profile_music_media_id, profile_bg_media_id, profile_custom,
         email_verified, deleted_at, connections,
         pgp_public_key, pgp_fingerprint
       FROM users WHERE id = ${user.id} LIMIT 1

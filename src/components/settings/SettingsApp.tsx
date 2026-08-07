@@ -52,6 +52,7 @@ type Me = {
   pending_deletion?: boolean;
   profile_theme?: string;
   profile_music_url?: string | null;
+  profile_bg_url?: string | null;
   profile_custom?: ProfileCustomStyle;
 };
 
@@ -97,6 +98,10 @@ export default function SettingsApp({
   const [musicUrl, setMusicUrl] = useState<string | null>(null);
   const [musicClear, setMusicClear] = useState(false);
   const [musicUploading, setMusicUploading] = useState(false);
+  const [bgId, setBgId] = useState<number | null>(null);
+  const [bgUrl, setBgUrl] = useState<string | null>(null);
+  const [bgClear, setBgClear] = useState(false);
+  const [bgUploading, setBgUploading] = useState(false);
   const [customBg, setCustomBg] = useState("");
   const [customFont, setCustomFont] = useState("");
   const [customPrimary, setCustomPrimary] = useState("");
@@ -149,6 +154,9 @@ export default function SettingsApp({
     setMusicUrl(u.profile_music_url || null);
     setMusicId(null);
     setMusicClear(false);
+    setBgUrl(u.profile_bg_url || null);
+    setBgId(null);
+    setBgClear(false);
     const pc = u.profile_custom || {};
     setCustomBg(pc.background || "");
     setCustomFont(pc.font || "");
@@ -207,18 +215,9 @@ export default function SettingsApp({
 
   async function uploadMedia(
     file: File,
-    kind: "image" | "audio" = "image"
+    kind: "image" | "audio" | "profile_bg" = "image"
   ): Promise<number | null> {
-    if (kind === "image") {
-      if (!file.type.startsWith("image/")) {
-        setError("solo imágenes (jpeg/png/webp/gif)");
-        return null;
-      }
-      if (file.size > 8 * 1024 * 1024) {
-        setError("imagen > 8MB");
-        return null;
-      }
-    } else {
+    if (kind === "audio") {
       const okAudio =
         file.type === "audio/mpeg" ||
         file.type === "audio/mp3" ||
@@ -231,13 +230,40 @@ export default function SettingsApp({
         setError("MP3 > 12MB — acortá el track");
         return null;
       }
+    } else if (kind === "profile_bg") {
+      const okImg =
+        file.type.startsWith("image/") ||
+        /\.(jpe?g|png|webp|gif)$/i.test(file.name);
+      if (!okImg) {
+        setError("fondo: solo jpeg/png/webp/gif");
+        return null;
+      }
+      if (file.size > 20 * 1024 * 1024) {
+        setError("fondo > 20MB");
+        return null;
+      }
+    } else {
+      if (!file.type.startsWith("image/")) {
+        setError("solo imágenes (jpeg/png/webp/gif)");
+        return null;
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        setError("imagen > 8MB");
+        return null;
+      }
     }
     const form = new FormData();
     form.append(
       "file",
       file,
-      file.name || (kind === "audio" ? "theme.mp3" : "photo.jpg")
+      file.name ||
+        (kind === "audio"
+          ? "theme.mp3"
+          : kind === "profile_bg"
+            ? "profile-bg.jpg"
+            : "photo.jpg")
     );
+    if (kind === "profile_bg") form.append("purpose", "profile_bg");
     const res = await fetch("/api/media", {
       method: "POST",
       body: form,
@@ -275,6 +301,23 @@ export default function SettingsApp({
       }
     } finally {
       setMusicUploading(false);
+    }
+  }
+
+  async function onBgPick(file: File | null) {
+    if (!file) return;
+    setBgUploading(true);
+    setError("");
+    try {
+      const id = await uploadMedia(file, "profile_bg");
+      if (id) {
+        setBgId(id);
+        setBgUrl(`/api/media/${id}`);
+        setBgClear(false);
+        setOk("fondo listo — guardá el perfil para aplicar");
+      }
+    } finally {
+      setBgUploading(false);
     }
   }
 
@@ -339,6 +382,8 @@ export default function SettingsApp({
       if (bannerId !== null) payload.banner_media_id = bannerId;
       if (musicClear) payload.profile_music_media_id = null;
       else if (musicId !== null) payload.profile_music_media_id = musicId;
+      if (bgClear) payload.profile_bg_media_id = null;
+      else if (bgId !== null) payload.profile_bg_media_id = bgId;
 
       const res = await apiFetch("/api/profile", {
         method: "PATCH",
@@ -356,10 +401,17 @@ export default function SettingsApp({
       setBannerId(null);
       setMusicId(null);
       setMusicClear(false);
+      setBgId(null);
+      setBgClear(false);
       if (d.user?.profile_music_url) {
         setMusicUrl(d.user.profile_music_url);
       } else if (musicClear) {
         setMusicUrl(null);
+      }
+      if (d.user?.profile_bg_url) {
+        setBgUrl(d.user.profile_bg_url);
+      } else if (bgClear) {
+        setBgUrl(null);
       }
     } catch {
       setError("red caída");
@@ -568,6 +620,10 @@ export default function SettingsApp({
   );
   const settingsThemeStyle = useMemo(() => {
     const base = profileThemeStyle(liveTheme);
+    // fondo custom en vivo (preview settings)
+    if (bgUrl && !bgClear) {
+      base["--pt-bg-image"] = `url(${bgUrl})`;
+    }
     // overrides en vivo (sin guardar aún)
     if (customBg.trim()) {
       base["--pt-card-bg"] = customBg.trim();
@@ -587,7 +643,15 @@ export default function SettingsApp({
     const font = fontStackFor(customFont.trim() || undefined);
     if (font) base["--pt-font"] = font;
     return base as CSSProperties;
-  }, [liveTheme, customBg, customPrimary, customAccent, customFont]);
+  }, [
+    liveTheme,
+    bgUrl,
+    bgClear,
+    customBg,
+    customPrimary,
+    customAccent,
+    customFont,
+  ]);
 
   if (loading) {
     return (
@@ -761,13 +825,57 @@ export default function SettingsApp({
             {bio.length}/100
           </p>
 
+          <h3 className="settings-sub">fondo personalizado (JPG/PNG/GIF)</h3>
+          <p className="muted" style={{ fontSize: "0.85rem" }}>
+            Imagen de fondo de tu perfil público. Máx <strong>20MB</strong> ·
+            GIFs animados admitidos. Pisa el fondo del tema base.
+          </p>
+          <div className="settings-bg-row">
+            {bgUrl && !bgClear ? (
+              <div
+                className="settings-bg-preview"
+                style={{ backgroundImage: `url(${bgUrl})` }}
+                title="preview fondo"
+              />
+            ) : (
+              <div className="settings-bg-preview empty">
+                <span className="muted">sin fondo custom</span>
+              </div>
+            )}
+            <div className="settings-inline">
+              <label className="btn secondary settings-file-btn">
+                {bgUploading ? "subiendo…" : "[ subir fondo ]"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif,.gif,.jpg,.jpeg,.png,.webp"
+                  hidden
+                  disabled={bgUploading || uploading}
+                  onChange={(e) => void onBgPick(e.target.files?.[0] || null)}
+                />
+              </label>
+              {(bgUrl || bgId) && !bgClear ? (
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => {
+                    setBgClear(true);
+                    setBgId(null);
+                    setBgUrl(null);
+                  }}
+                >
+                  [ quitar fondo ]
+                </button>
+              ) : null}
+            </div>
+          </div>
+
           <h3 className="settings-sub">tema del perfil público</h3>
           <p className="muted" style={{ fontSize: "0.85rem" }}>
-            Fondo, colores y decoración en{" "}
+            Colores y decoración en{" "}
             <Link href={`/u/${encodeURIComponent(me.username)}`}>
               /u/{me.username}
             </Link>
-            . No todos tienen que ser matrix-verde.
+            . El fondo custom (arriba) tiene prioridad sobre el del tema.
           </p>
           <div className="profile-theme-grid" role="listbox" aria-label="tema de perfil">
             {PROFILE_THEMES.map((t) => (

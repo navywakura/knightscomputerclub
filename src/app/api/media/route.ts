@@ -5,10 +5,12 @@ import { moderateImageBuffer } from "@/lib/nsfw";
 import { mediaJsonSchema, parseJsonBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+/** Subidas grandes de fondo (hasta 20MB) pueden necesitar más tiempo */
+export const maxDuration = 120;
 
-const MAX_BYTES = 8 * 1024 * 1024; // 8MB imágenes/PDF
+const MAX_BYTES = 8 * 1024 * 1024; // 8MB imágenes/PDF normales
 const MAX_AUDIO_BYTES = 12 * 1024 * 1024; // 12MB MP3 perfil
+const MAX_PROFILE_BG_BYTES = 20 * 1024 * 1024; // 20MB fondo de perfil (JPG/PNG/WebP/GIF)
 const IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -54,9 +56,12 @@ export async function POST(req: Request) {
     let buf: Buffer;
     let filename = "";
 
+    let purpose = "";
+
     if (contentType.includes("multipart/form-data")) {
       const form = await req.formData();
       const file = form.get("file");
+      purpose = String(form.get("purpose") || "").trim().toLowerCase();
       if (!file || !(file instanceof File)) {
         return NextResponse.json(
           { error: "campo file requerido" },
@@ -78,17 +83,48 @@ export async function POST(req: Request) {
       ) {
         mime = "audio/mpeg";
       }
+      if (
+        (!mime || mime === "application/octet-stream") &&
+        /\.(gif|jpe?g|png|webp)$/i.test(filename)
+      ) {
+        const ext = filename.toLowerCase().split(".").pop();
+        mime =
+          ext === "gif"
+            ? "image/gif"
+            : ext === "png"
+              ? "image/png"
+              : ext === "webp"
+                ? "image/webp"
+                : "image/jpeg";
+      }
       const isAudio = isAudioMime(mime) || filename.toLowerCase().endsWith(".mp3");
-      const max = isAudio ? MAX_AUDIO_BYTES : MAX_BYTES;
+      const isProfileBg = purpose === "profile_bg";
+      const max = isAudio
+        ? MAX_AUDIO_BYTES
+        : isProfileBg
+          ? MAX_PROFILE_BG_BYTES
+          : MAX_BYTES;
       if (!IMAGE_TYPES.has(mime) && mime !== PDF_TYPE && !isAudio) {
         return NextResponse.json(
           { error: "solo jpeg/png/webp/gif, PDF o MP3" },
           { status: 400 }
         );
       }
+      if (isProfileBg && !IMAGE_TYPES.has(mime)) {
+        return NextResponse.json(
+          { error: "fondo de perfil: solo jpeg/png/webp/gif" },
+          { status: 400 }
+        );
+      }
       if (file.size > max) {
         return NextResponse.json(
-          { error: isAudio ? "MP3 > 12MB" : "archivo > 8MB" },
+          {
+            error: isAudio
+              ? "MP3 > 12MB"
+              : isProfileBg
+                ? "fondo > 20MB"
+                : "archivo > 8MB",
+          },
           { status: 400 }
         );
       }
@@ -99,14 +135,22 @@ export async function POST(req: Request) {
       if (!parsed.ok) {
         return NextResponse.json({ error: parsed.error }, { status: 400 });
       }
-      const body = parsed.data;
+      const body = parsed.data as Record<string, unknown>;
+      purpose = String(body.purpose || "").trim().toLowerCase();
       const b64 = String(body.data || body.base64 || "");
       mime = String(body.mime || body.type || "image/jpeg");
       filename = String(body.filename || body.name || "").slice(0, 180);
       const isAudio = isAudioMime(mime) || filename.toLowerCase().endsWith(".mp3");
+      const isProfileBg = purpose === "profile_bg";
       if (!IMAGE_TYPES.has(mime) && mime !== PDF_TYPE && !isAudio) {
         return NextResponse.json(
           { error: "solo jpeg/png/webp/gif, PDF o MP3" },
+          { status: 400 }
+        );
+      }
+      if (isProfileBg && !IMAGE_TYPES.has(mime)) {
+        return NextResponse.json(
+          { error: "fondo de perfil: solo jpeg/png/webp/gif" },
           { status: 400 }
         );
       }
@@ -118,10 +162,20 @@ export async function POST(req: Request) {
       }
       const raw = b64.includes(",") ? b64.split(",")[1] : b64;
       buf = Buffer.from(raw, "base64");
-      const max = isAudio ? MAX_AUDIO_BYTES : MAX_BYTES;
+      const max = isAudio
+        ? MAX_AUDIO_BYTES
+        : isProfileBg
+          ? MAX_PROFILE_BG_BYTES
+          : MAX_BYTES;
       if (buf.length > max) {
         return NextResponse.json(
-          { error: isAudio ? "MP3 > 12MB" : "archivo > 8MB" },
+          {
+            error: isAudio
+              ? "MP3 > 12MB"
+              : isProfileBg
+                ? "fondo > 20MB"
+                : "archivo > 8MB",
+          },
           { status: 400 }
         );
       }

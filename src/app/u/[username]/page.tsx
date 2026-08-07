@@ -31,7 +31,7 @@ async function loadUser(username: string) {
       SELECT
         id, username, role, is_vip, created_at,
         display_name, avatar_media_id, banner_media_id, bio, connections,
-        profile_theme, profile_music_media_id, profile_custom,
+        profile_theme, profile_music_media_id, profile_bg_media_id, profile_custom,
         pgp_fingerprint, pgp_public_key
       FROM users
       WHERE lower(username) = ${uname}
@@ -155,14 +155,82 @@ export default async function PublicProfilePage({ params }: Props) {
   const musicUrl = u.profile_music_media_id
     ? `/api/media/${u.profile_music_media_id}`
     : null;
+  const customBgUrl = u.profile_bg_media_id
+    ? `/api/media/${u.profile_bg_media_id}`
+    : null;
+  // fallback stock para navywakura si aún no subió fondo
+  const stockBg =
+    String(u.username).toLowerCase() === "navywakura"
+      ? "/profile-themes/navywakura-bg.jpg"
+      : null;
+  const pageBgUrl = customBgUrl || stockBg;
+  if (pageBgUrl) {
+    themeStyle["--pt-bg-image"] = `url(${pageBgUrl})`;
+  }
   const custom = parseProfileCustom(u.profile_custom);
-  const customCss = buildProfileCustomCss(String(u.username), custom);
+  // CSS de montañas base para navywakura (colores fríos + banner)
+  let customCss = buildProfileCustomCss(String(u.username), custom);
+  if (
+    String(u.username).toLowerCase() === "navywakura" &&
+    pageBgUrl &&
+    !custom.css
+  ) {
+    const mountains = `
+.profile-theme-bg {
+  background-image:
+    linear-gradient(180deg, rgba(8,12,22,0.55) 0%, rgba(8,12,22,0.72) 45%, rgba(6,10,18,0.9) 100%),
+    url("${pageBgUrl}") !important;
+  background-size: cover !important;
+  background-position: center 40% !important;
+}
+.profile-public-banner {
+  background-image:
+    linear-gradient(180deg, transparent 20%, rgba(8,12,22,0.75)),
+    url("${pageBgUrl}") !important;
+  background-size: cover !important;
+  background-position: center 35% !important;
+}
+.profile-public-shell,
+.profile-feed {
+  background: rgba(12, 16, 28, 0.88) !important;
+  border-color: #6b8cae !important;
+  box-shadow: 0 0 28px rgba(120, 160, 220, 0.25) !important;
+}
+.profile-public-av {
+  border-color: #9eb6d4 !important;
+}
+`.trim();
+    customCss = [customCss, mountains].filter(Boolean).join("\n");
+  } else if (pageBgUrl && !custom.css) {
+    // cualquier user con fondo custom: aplicar cover
+    customCss = [
+      customCss,
+      `.profile-theme-bg {
+  background-image:
+    linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.78) 100%),
+    url("${pageBgUrl}") !important;
+  background-size: cover !important;
+  background-position: center !important;
+}
+.profile-public-banner {
+  background-image:
+    linear-gradient(180deg, transparent 25%, rgba(0,0,0,0.7)),
+    url("${pageBgUrl}") !important;
+  background-size: cover !important;
+  background-position: center !important;
+}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
   const handle = String(u.username);
   const posts = await loadUserPosts(Number(u.id));
 
   return (
     <main
-      className={`page profile-public profile-theme profile-theme-${theme.id}`}
+      className={`page profile-public profile-theme profile-theme-${theme.id}${
+        pageBgUrl ? " has-custom-bg" : ""
+      }`}
       style={themeStyle as CSSProperties}
       data-theme={theme.id}
       data-profile-user={handle}

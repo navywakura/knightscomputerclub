@@ -182,6 +182,9 @@ export const profilePatchSchema = z
     profile_music_media_id: z
       .union([z.coerce.number().int().positive(), z.null(), z.literal("")])
       .optional(),
+    profile_bg_media_id: z
+      .union([z.coerce.number().int().positive(), z.null(), z.literal("")])
+      .optional(),
     profile_custom: z
       .object({
         background: z.string().max(40).optional(),

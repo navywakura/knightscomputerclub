@@ -237,6 +237,11 @@ export async function ensureSchema() {
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS profile_custom JSONB NOT NULL DEFAULT '{}'::jsonb
   `;
+  // Fondo personalizado del perfil (JPG/PNG/WebP/GIF hasta 20MB vía media)
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS profile_bg_media_id INT REFERENCES media(id) ON DELETE SET NULL
+  `;
   // Verificación email + soft delete (7 días)
   await db`
     ALTER TABLE users
@@ -853,6 +858,7 @@ export type UserRow = {
   bio?: string | null;
   profile_theme?: string | null;
   profile_music_media_id?: number | null;
+  profile_bg_media_id?: number | null;
   profile_custom?: unknown;
   email_verified?: boolean;
   deleted_at?: string | null;
@@ -873,6 +879,7 @@ export type PublicUser = {
   bio: string;
   profile_theme: string;
   profile_music_url: string | null;
+  profile_bg_url: string | null;
   profile_custom?: {
     background?: string;
     font?: string;
