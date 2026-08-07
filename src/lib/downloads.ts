@@ -78,7 +78,7 @@ export const DOWNLOAD_PLATFORMS: DownloadPlatform[] = [
       { label: "Todas las releases", href: GH_LATEST },
     ],
     notes:
-      "App de escritorio para // nexo. La UI se actualiza sola desde la web; el shell usa auto-update vía GitHub Releases.",
+      "App de escritorio para // nexo. La UI se actualiza sola desde la web; el shell usa auto-update vía GitHub Releases. Sin certificado Authenticode de pago, Windows SmartScreen puede avisar la primera vez (Más info → Ejecutar de todos modos).",
   },
   {
     id: "macos",
@@ -94,7 +94,7 @@ export const DOWNLOAD_PLATFORMS: DownloadPlatform[] = [
       { label: "Todas las releases", href: GH_LATEST },
     ],
     notes:
-      "App de escritorio para // nexo. M1/M2/M3/M4 → Apple Silicon; Mac antiguos → Intel. Sin firma de Apple: clic derecho en la app → Abrir la primera vez (o xattr -cr en Terminal). Auto-update vía GitHub Releases.",
+      "App de escritorio para // nexo. M1/M2/M3/M4 → Apple Silicon; Mac Intel → x64. Sin Developer ID de Apple ($99/año) Gatekeeper marca la app: en Terminal corré  bash <(curl -fsSL https://raw.githubusercontent.com/navywakura/knightscomputerclub/main/scripts/fix-macos-kcc-nexo.sh)  o xattr -cr \"/Applications/KCC Nexo.app\". Auto-update vía GitHub Releases.",
   },
   {
     id: "linux",

@@ -46,17 +46,24 @@ npm run dist:mac:arm64 # solo M1/M2/M3/M4
 npm run dist:mac:x64   # solo Intel
 ```
 
-### macOS sin certificado Apple
+### macOS Gatekeeper / Windows SmartScreen
 
-Los DMG se firman con `identity: null` (unsigned). Gatekeeper bloqueará
-el primer arranque:
+Sin certificados de pago, los SO van a avisar. Guía completa:
+**[docs/code-signing.md](./code-signing.md)**.
 
-1. Abrí el DMG → arrastrá **KCC Nexo** a Aplicaciones
-2. Clic derecho en la app → **Abrir** → Abrir
-3. O en Terminal: `xattr -cr "/Applications/KCC Nexo.app"`
+Arreglo rápido macOS (app “dañada”):
 
-Con un Apple Developer ID se puede firmar + notarizar después
-(`CSC_LINK` / `APPLE_ID` en el entorno de build).
+```bash
+bash scripts/fix-macos-kcc-nexo.sh
+```
+
+Firma real (cuando tengas certs en `.env.local`):
+
+```bash
+# mac: APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID + Developer ID en Keychain
+# win: CSC_LINK=/ruta/cert.pfx  CSC_KEY_PASSWORD=…
+cd electron && npm run dist:mac:all   # o dist:win
+```
 
 ## Notas
 

@@ -239,15 +239,34 @@ function buildElectron(version) {
     );
   }
 
+  // Firma: ver docs/code-signing.md
+  // - Windows Authenticode: CSC_LINK + CSC_KEY_PASSWORD
+  // - macOS Developer ID + notarize: keychain / CSC_NAME + APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID
+  // - Sin certs: run-builder.js hace ad-hoc (mac) / unsigned (win)
+  const hasWinCert = Boolean(
+    process.env.CSC_LINK || process.env.WIN_CSC_LINK
+  );
+  const hasAppleNotary = Boolean(
+    (process.env.APPLE_ID &&
+      (process.env.APPLE_APP_SPECIFIC_PASSWORD || process.env.APPLE_PASSWORD) &&
+      process.env.APPLE_TEAM_ID) ||
+      (process.env.APPLE_API_KEY &&
+        process.env.APPLE_API_KEY_ID &&
+        process.env.APPLE_API_ISSUER)
+  );
+  log(
+    `\n── signing: win=${hasWinCert ? "CSC_LINK" : "unsigned"} mac=${
+      hasAppleNotary ? "notarize-ready" : "ad-hoc/no-notary"
+    } ──`
+  );
+
   const envBase = {
     GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN || "",
-    // sin Apple Developer cert: no fallar buscando identity
-    CSC_IDENTITY_AUTO_DISCOVERY: "false",
   };
 
   if (doWin) {
     log("\n── build Electron (win nsis + portable) ──");
-    run("npx electron-builder --win --publish never", {
+    run("node scripts/run-builder.js --win", {
       cwd: ELECTRON_DIR,
       env: envBase,
     });
@@ -258,12 +277,12 @@ function buildElectron(version) {
   if (doMac) {
     // secuencial: en paralelo hdiutil pelea por /Volumes/KCC Nexo …
     log("\n── build Electron (mac dmg arm64) ──");
-    run("npx electron-builder --mac --arm64 --publish never", {
+    run("node scripts/run-builder.js --mac --arm64", {
       cwd: ELECTRON_DIR,
       env: envBase,
     });
     log("\n── build Electron (mac dmg x64) ──");
-    run("npx electron-builder --mac --x64 --publish never", {
+    run("node scripts/run-builder.js --mac --x64", {
       cwd: ELECTRON_DIR,
       env: envBase,
     });
