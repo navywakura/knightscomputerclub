@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import ForumApp from "@/components/forum/ForumApp";
 import { ensureSchema, getDb } from "@/lib/db";
-import { excerptBody } from "@/lib/markdown";
+import {
+  excerptBody,
+  firstImageAbsoluteUrl,
+  firstImageUrl,
+  plainTextFromBody,
+} from "@/lib/markdown";
+import { getSiteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +58,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
+  const base = getSiteUrl();
   const title = String(row.title);
   const author = String(row.author_name);
   const board = String(row.category_name);
@@ -60,16 +68,35 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     `Hilo en ${board} por @${author} · knightscomputer.club`;
   const path = `/forum/thread/${threadId}`;
   const ogTitle = `${title} · ${board}`;
+  const absImg = firstImageAbsoluteUrl(body, base);
+  const ogCard = `${base}/forum/thread/${threadId}/opengraph-image`;
+
+  const images = absImg
+    ? [
+        {
+          url: absImg,
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+        { url: ogCard, width: 1200, height: 630, alt: ogTitle },
+      ]
+    : [{ url: ogCard, width: 1200, height: 630, alt: title }];
 
   return {
     title,
     description,
-    alternates: { canonical: path },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: { index: true, follow: true },
+    },
+    alternates: { canonical: `${base}${path}` },
     openGraph: {
       title: ogTitle,
       description,
       type: "article",
-      url: path,
+      url: `${base}${path}`,
       siteName: "knightscomputer.club",
       locale: "es_ES",
       publishedTime: row.created_at
@@ -80,20 +107,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         : undefined,
       authors: [`@${author}`],
       section: board,
-      images: [
-        {
-          url: `/forum/thread/${threadId}/opengraph-image`,
-          width: 1200,
-          height: 630,
-          alt: title,
-        },
-      ],
+      images,
     },
     twitter: {
       card: "summary_large_image",
       title: ogTitle,
       description,
-      images: [`/forum/thread/${threadId}/opengraph-image`],
+      images: [absImg || ogCard],
     },
   };
 }
@@ -103,5 +123,76 @@ export default async function ThreadPage({ params }: Props) {
   const threadId = Number(id);
   if (!threadId) notFound();
 
-  return <ForumApp initialThreadId={threadId} />;
+  const row = await loadThreadMeta(threadId);
+  if (!row) notFound();
+
+  const base = getSiteUrl();
+  const title = String(row.title);
+  const author = String(row.author_name);
+  const board = String(row.category_name);
+  const boardSlug = String(row.category_slug);
+  const body = row.first_body ? String(row.first_body) : "";
+  const text = plainTextFromBody(body);
+  const img = firstImageUrl(body);
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "DiscussionForumPosting",
+    headline: title,
+    articleBody: text.slice(0, 5000),
+    datePublished: row.created_at
+      ? new Date(String(row.created_at)).toISOString()
+      : undefined,
+    dateModified: row.updated_at
+      ? new Date(String(row.updated_at)).toISOString()
+      : undefined,
+    author: {
+      "@type": "Person",
+      name: author,
+      url: `${base}/u/${encodeURIComponent(author)}`,
+    },
+    url: `${base}/forum/thread/${threadId}`,
+    publisher: {
+      "@type": "Organization",
+      name: "knightscomputer.club",
+      url: base,
+    },
+    ...(img
+      ? {
+          image: img.startsWith("http")
+            ? img
+            : `${base}${img.startsWith("/") ? img : `/${img}`}`,
+        }
+      : {}),
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <article className="forum-seo-article">
+        <header>
+          <p className="muted">
+            <Link href={`/forum/${boardSlug}`}>{board}</Link>
+          </p>
+          <h1>{title}</h1>
+          <p>
+            por{" "}
+            <Link href={`/u/${encodeURIComponent(author)}`}>@{author}</Link>
+            {row.created_at
+              ? ` · ${new Date(String(row.created_at)).toLocaleString()}`
+              : ""}
+          </p>
+        </header>
+        {img ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={img} alt="" className="forum-seo-img" loading="eager" />
+        ) : null}
+        <div className="forum-seo-body">{text}</div>
+      </article>
+      <ForumApp initialThreadId={threadId} />
+    </>
+  );
 }

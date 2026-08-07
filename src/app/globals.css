@@ -5249,6 +5249,54 @@ body.nexo-app-active footer {
   background: #050a06;
 }
 
+/* SEO crawlable post/thread content (hidden when SPA forum is active) */
+.forum-seo-article {
+  max-width: 720px;
+  margin: 0 auto 16px;
+  padding: 16px 14px 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text);
+}
+
+.forum-seo-article h1 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--green);
+  margin: 0.4em 0;
+}
+
+.forum-seo-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  margin: 12px 0;
+  font-size: 0.95rem;
+}
+
+.forum-seo-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 12px 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+/* Usuarios logueados ven la SPA a pantalla completa: el artículo SEO
+   sigue en el DOM para crawlers pero fuera de la vista */
+body.forum-app-active .forum-seo-article {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* guest forum bar */
 .forum-guest-shell {
   min-height: 50vh;

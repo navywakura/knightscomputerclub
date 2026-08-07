@@ -1,6 +1,10 @@
 import type { MetadataRoute } from "next";
 import { getSiteUrl } from "@/lib/site";
 
+/**
+ * SEO: posts e hilos del foro son públicos e indexables.
+ * La SPA /forum (browse) y nexo/admin/auth siguen fuera del índice.
+ */
 export default function robots(): MetadataRoute.Robots {
   const base = getSiteUrl();
 
@@ -8,22 +12,49 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: "/",
+        allow: [
+          "/",
+          "/donate",
+          "/u/",
+          "/forum/post/",
+          "/forum/thread/",
+          "/descargar",
+        ],
         disallow: [
           "/admin",
           "/admin/",
           "/api/",
           "/auth/",
-          "/forum",
-          "/forum/",
           "/nexo",
           "/nexo/",
+          "/settings",
+          "/settings/",
+          "/forum/new",
+        ],
+      },
+      {
+        userAgent: "Googlebot",
+        allow: [
+          "/",
+          "/donate",
+          "/u/",
+          "/forum/post/",
+          "/forum/thread/",
+          "/descargar",
+        ],
+        disallow: [
+          "/admin",
+          "/api/",
+          "/auth/",
+          "/nexo",
+          "/settings",
+          "/forum/new",
         ],
       },
       {
         userAgent: "GPTBot",
-        allow: ["/", "/donate"],
-        disallow: ["/admin", "/api/", "/auth/", "/forum", "/nexo"],
+        allow: ["/", "/donate", "/forum/post/", "/forum/thread/", "/u/"],
+        disallow: ["/admin", "/api/", "/auth/", "/nexo", "/settings"],
       },
     ],
     sitemap: `${base}/sitemap.xml`,

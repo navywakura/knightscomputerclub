@@ -39,6 +39,18 @@ export function firstImageUrl(body: string): string | null {
   return null;
 }
 
+/** Primera imagen del post como URL absoluta (SEO / Open Graph). */
+export function firstImageAbsoluteUrl(
+  body: string,
+  siteOrigin: string
+): string | null {
+  const rel = firstImageUrl(body);
+  if (!rel) return null;
+  if (rel.startsWith("http://") || rel.startsWith("https://")) return rel;
+  const base = siteOrigin.replace(/\/$/, "");
+  return `${base}${rel.startsWith("/") ? rel : `/${rel}`}`;
+}
+
 /**
  * Render simple para replies/comentarios: sin markdown de formato,
  * solo saltos de línea, imágenes md y links.

@@ -1,11 +1,13 @@
 import { ImageResponse } from "next/og";
 import { ensureSchema, getDb } from "@/lib/db";
 import { excerptBody, plainTextFromBody } from "@/lib/markdown";
+import { resolvePostImageDataUrl } from "@/lib/og-image";
 
 export const runtime = "nodejs";
 export const alt = "knightscomputer.club post";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+export const revalidate = 300;
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -23,6 +25,8 @@ export default async function Image({ params }: Props) {
   let author = "guest";
   let board = "foro";
   let body = "knightscomputer.club";
+  let rawBody = "";
+  let imgData: string | null = null;
 
   if (postId) {
     try {
@@ -45,11 +49,101 @@ export default async function Image({ params }: Props) {
         threadTitle = String(rows[0].thread_title);
         author = String(rows[0].author_name);
         board = String(rows[0].category_name);
-        body = plainTextFromBody(String(rows[0].body || ""));
+        rawBody = String(rows[0].body || "");
+        body = plainTextFromBody(rawBody);
+        imgData = await resolvePostImageDataUrl(rawBody);
       }
     } catch {
       /* fallback */
     }
+  }
+
+  // Si hay imagen en el post → card visual con la foto
+  if (imgData) {
+    return new ImageResponse(
+      (
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            background: "#020403",
+            color: "#33ff66",
+            fontFamily: "monospace",
+            border: "8px solid #1f5a2a",
+            boxSizing: "border-box",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flex: 1,
+              position: "relative",
+              minHeight: 0,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imgData}
+              alt=""
+              width={1200}
+              height={480}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 120,
+                background:
+                  "linear-gradient(transparent, rgba(2,4,3,0.95))",
+              }}
+            />
+          </div>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              padding: "16px 40px 28px",
+              background: "#020403",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 18,
+                color: "#1a9940",
+              }}
+            >
+              <span>knightscomputer.club · {board}</span>
+              <span>@{author}</span>
+            </div>
+            <div
+              style={{
+                fontSize: 32,
+                fontWeight: 700,
+                color: "#7CFF9A",
+                overflow: "hidden",
+                maxHeight: 48,
+              }}
+            >
+              {clip(threadTitle, 70)}
+            </div>
+          </div>
+        </div>
+      ),
+      { ...size }
+    );
   }
 
   return new ImageResponse(

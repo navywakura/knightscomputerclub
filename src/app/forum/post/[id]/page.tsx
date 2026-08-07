@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import ForumApp from "@/components/forum/ForumApp";
 import { ensureSchema, getDb } from "@/lib/db";
-import { excerptBody, firstImageUrl, plainTextFromBody } from "@/lib/markdown";
+import {
+  excerptBody,
+  firstImageAbsoluteUrl,
+  firstImageUrl,
+  plainTextFromBody,
+} from "@/lib/markdown";
+import { getSiteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +55,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
+  const base = getSiteUrl();
   const threadTitle = String(row.thread_title);
   const author = String(row.author_name);
   const board = String(row.category_name);
@@ -57,17 +65,44 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     `Post de @${author} en ${threadTitle} · knightscomputer.club`;
   const path = `/forum/post/${postId}`;
   const ogTitle = `${threadTitle} — @${author}`;
-  const img = firstImageUrl(body);
+  const absImg = firstImageAbsoluteUrl(body, base);
+  const ogCard = `${base}/forum/post/${postId}/opengraph-image`;
+
+  // Preferir la imagen real del post en OG (Google / redes)
+  const images = absImg
+    ? [
+        {
+          url: absImg,
+          width: 1200,
+          height: 630,
+          alt: plainTextFromBody(body).slice(0, 80) || threadTitle,
+        },
+        {
+          url: ogCard,
+          width: 1200,
+          height: 630,
+          alt: ogTitle,
+        },
+      ]
+    : [
+        {
+          url: ogCard,
+          width: 1200,
+          height: 630,
+          alt: plainTextFromBody(body).slice(0, 80) || threadTitle,
+        },
+      ];
 
   return {
     title: `post #${postId} · ${threadTitle}`,
     description,
-    alternates: { canonical: path },
+    robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
+    alternates: { canonical: `${base}${path}` },
     openGraph: {
       title: ogTitle,
       description,
       type: "article",
-      url: path,
+      url: `${base}${path}`,
       siteName: "knightscomputer.club",
       locale: "es_ES",
       publishedTime: row.created_at
@@ -75,21 +110,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         : undefined,
       authors: [`@${author}`],
       section: board,
-      images: [
-        {
-          url: `/forum/post/${postId}/opengraph-image`,
-          width: 1200,
-          height: 630,
-          alt: plainTextFromBody(body).slice(0, 80) || threadTitle,
-        },
-        ...(img ? [{ url: img, alt: "adjunto del post" }] : []),
-      ],
+      images,
     },
     twitter: {
       card: "summary_large_image",
       title: ogTitle,
       description,
-      images: [`/forum/post/${postId}/opengraph-image`],
+      images: [absImg || ogCard],
     },
   };
 }
@@ -103,5 +130,91 @@ export default async function PostPage({ params }: Props) {
   if (!post) notFound();
 
   const threadId = Number(post.thread_id);
-  return <ForumApp initialThreadId={threadId} />;
+  const body = String(post.body || "");
+  const threadTitle = String(post.thread_title);
+  const author = String(post.author_name);
+  const board = String(post.category_name);
+  const boardSlug = String(post.category_slug);
+  const img = firstImageUrl(body);
+  const text = plainTextFromBody(body);
+  const base = getSiteUrl();
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "DiscussionForumPosting",
+    headline: threadTitle,
+    articleBody: text.slice(0, 5000),
+    datePublished: post.created_at
+      ? new Date(String(post.created_at)).toISOString()
+      : undefined,
+    dateModified: post.updated_at
+      ? new Date(String(post.updated_at)).toISOString()
+      : undefined,
+    author: {
+      "@type": "Person",
+      name: author,
+      url: `${base}/u/${encodeURIComponent(author)}`,
+    },
+    url: `${base}/forum/post/${postId}`,
+    isPartOf: {
+      "@type": "DiscussionForumPosting",
+      name: threadTitle,
+      url: `${base}/forum/thread/${threadId}`,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "knightscomputer.club",
+      url: base,
+    },
+    ...(img
+      ? {
+          image: img.startsWith("http")
+            ? img
+            : `${base}${img.startsWith("/") ? img : `/${img}`}`,
+        }
+      : {}),
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      {/* Contenido server-side para crawlers (Google). La SPA lo oculta visualmente. */}
+      <article className="forum-seo-article">
+        <header>
+          <p className="muted">
+            <Link href={`/forum/${boardSlug}`}>{board}</Link>
+            {" · "}
+            <Link href={`/forum/thread/${threadId}`}>{threadTitle}</Link>
+          </p>
+          <h1>
+            post #{postId} · {threadTitle}
+          </h1>
+          <p>
+            por{" "}
+            <Link href={`/u/${encodeURIComponent(author)}`}>@{author}</Link>
+            {post.created_at
+              ? ` · ${new Date(String(post.created_at)).toLocaleString()}`
+              : ""}
+          </p>
+        </header>
+        {img ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={img}
+            alt=""
+            className="forum-seo-img"
+            loading="eager"
+          />
+        ) : null}
+        <div className="forum-seo-body">{text}</div>
+        <p>
+          <Link href={`/forum/thread/${threadId}`}>ver hilo completo →</Link>
+        </p>
+      </article>
+      <ForumApp initialThreadId={threadId} />
+    </>
+  );
 }
