@@ -292,6 +292,11 @@ export async function ensureSchema() {
   await db`
     CREATE INDEX IF NOT EXISTS idx_nexo_boards_updated ON nexo_boards(updated_at DESC)
   `;
+  // Icono / foto del tablón (media subida por el owner)
+  await db`
+    ALTER TABLE nexo_boards
+    ADD COLUMN IF NOT EXISTS icon_media_id INT REFERENCES media(id) ON DELETE SET NULL
+  `;
 
   await db`
     CREATE TABLE IF NOT EXISTS nexo_messages (

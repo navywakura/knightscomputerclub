@@ -102,8 +102,23 @@ export const nexoBoardPostSchema = z
     name: z.string().min(2).max(64),
     description: z.string().max(400).optional(),
     slug: z.string().max(48).optional(),
+    icon_media_id: z
+      .union([z.coerce.number().int().positive(), z.null(), z.literal("")])
+      .optional(),
     captcha_token: captchaToken,
     captcha_answer: captchaAnswer,
+  })
+  .strict();
+
+/** PATCH board: owner edita nombre, descripción e icono */
+export const nexoBoardPatchSchema = z
+  .object({
+    board_id: z.coerce.number().int().positive(),
+    name: z.string().min(2).max(64).optional(),
+    description: z.string().max(400).optional(),
+    icon_media_id: z
+      .union([z.coerce.number().int().positive(), z.null(), z.literal("")])
+      .optional(),
   })
   .strict();
 

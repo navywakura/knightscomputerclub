@@ -56,6 +56,8 @@ type Board = {
   owner_role?: string;
   message_count: number;
   updated_at: string;
+  icon_media_id?: number | null;
+  icon_url?: string | null;
 };
 
 type BoardMember = {
@@ -152,6 +154,9 @@ export default function NexoApp({
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [newIconId, setNewIconId] = useState<number | null>(null);
+  const [newIconPreview, setNewIconPreview] = useState<string | null>(null);
+  const [iconUploading, setIconUploading] = useState(false);
   const [boardCaptchaToken, setBoardCaptchaToken] = useState("");
   const [boardCaptchaAnswer, setBoardCaptchaAnswer] = useState("");
   const [boardCaptchaKey, setBoardCaptchaKey] = useState(0);
@@ -160,6 +165,18 @@ export default function NexoApp({
     boardId: number;
     forumPath: string | null;
   } | null>(null);
+
+  // editar board (owner)
+  const [showEditBoard, setShowEditBoard] = useState(false);
+  const [editBoardId, setEditBoardId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editIconId, setEditIconId] = useState<number | null>(null);
+  const [editIconPreview, setEditIconPreview] = useState<string | null>(
+    null
+  );
+  const [editIconClear, setEditIconClear] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
 
   // DM
   const [dmThreads, setDmThreads] = useState<DmThread[]>([]);
@@ -558,6 +575,120 @@ export default function NexoApp({
     return () => window.clearInterval(iv);
   }, [tab, loadFriends]);
 
+  async function uploadBoardIcon(file: File | null): Promise<{
+    id: number;
+    url: string;
+  } | null> {
+    if (!file) return null;
+    if (!file.type.startsWith("image/")) {
+      setError("icono: solo imágenes (jpeg/png/webp/gif)");
+      return null;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError("icono: imagen > 8MB");
+      return null;
+    }
+    setIconUploading(true);
+    setError("");
+    try {
+      const form = new FormData();
+      form.append("file", file, file.name || "board-icon.jpg");
+      const res = await fetch("/api/media", {
+        method: "POST",
+        body: form,
+        credentials: "include",
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(String(d.error || "error al subir icono"));
+        return null;
+      }
+      const id = Number(d.id);
+      if (!Number.isFinite(id)) {
+        setError("upload inválido");
+        return null;
+      }
+      return { id, url: `/api/media/${id}` };
+    } catch {
+      setError("red caída al subir icono");
+      return null;
+    } finally {
+      setIconUploading(false);
+    }
+  }
+
+  async function onCreateIconPick(file: File | null) {
+    const up = await uploadBoardIcon(file);
+    if (up) {
+      setNewIconId(up.id);
+      setNewIconPreview(up.url);
+    }
+  }
+
+  async function onEditIconPick(file: File | null) {
+    const up = await uploadBoardIcon(file);
+    if (up) {
+      setEditIconId(up.id);
+      setEditIconPreview(up.url);
+      setEditIconClear(false);
+    }
+  }
+
+  function openEditBoard(b: Board) {
+    setEditBoardId(b.id);
+    setEditName(b.name);
+    setEditDesc(b.description || "");
+    setEditIconId(b.icon_media_id ?? null);
+    setEditIconPreview(b.icon_url || null);
+    setEditIconClear(false);
+    setShowEditBoard(true);
+    setError("");
+  }
+
+  async function saveEditBoard(e: FormEvent) {
+    e.preventDefault();
+    if (!editBoardId) return;
+    const name = editName.trim();
+    if (name.length < 2) {
+      setError("nombre ≥ 2 caracteres");
+      return;
+    }
+    setEditSaving(true);
+    setError("");
+    try {
+      const payload: Record<string, unknown> = {
+        board_id: editBoardId,
+        name,
+        description: editDesc.trim(),
+      };
+      if (editIconClear) {
+        payload.icon_media_id = null;
+      } else if (editIconId != null) {
+        payload.icon_media_id = editIconId;
+      }
+
+      const res = await apiFetch("/api/nexo/boards", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error || "error al guardar");
+        return;
+      }
+      setShowEditBoard(false);
+      setEditBoardId(null);
+      await loadBoards();
+      setCopyOk("tablón actualizado");
+      window.setTimeout(() => setCopyOk(""), 2500);
+    } catch {
+      setError("red caída");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   async function createBoard(e: FormEvent) {
     e.preventDefault();
     setError("");
@@ -581,6 +712,7 @@ export default function NexoApp({
           description: newDesc.trim(),
           captcha_token: boardCaptchaToken,
           captcha_answer: boardCaptchaAnswer,
+          ...(newIconId != null ? { icon_media_id: newIconId } : {}),
         }),
       });
       const d = await res.json();
@@ -599,12 +731,15 @@ export default function NexoApp({
       });
       setNewName("");
       setNewDesc("");
+      setNewIconId(null);
+      setNewIconPreview(null);
       setBoardCaptchaAnswer("");
       setBoardCaptchaKey((k) => k + 1);
       await loadBoards();
       if (d.board?.id) {
         setBoardId(Number(d.board.id));
         lastIdRef.current = 0;
+        setMobilePane("chat");
       }
     } catch {
       setError("red caída");
@@ -853,6 +988,13 @@ export default function NexoApp({
   const activeBoard = boards.find((b) => b.id === boardId) || null;
   const chatMsgs = tab === "boards" ? messages : dmMessages;
 
+  const canEditBoard = (b: Board | null) =>
+    !!(
+      b &&
+      me &&
+      (b.owner_id === me.id || me.role === "owner")
+    );
+
   const boardCtxFor = (b: Board | null): ContextMenuItem[] => [
     { id: "open", label: "abrir chat" },
     { id: "copy", label: "copiar nombre" },
@@ -860,6 +1002,11 @@ export default function NexoApp({
       id: "invite",
       label: "copiar enlace de invitación",
       disabled: !b,
+    },
+    {
+      id: "edit",
+      label: "editar tablón / icono",
+      disabled: !canEditBoard(b),
     },
     { id: "sep1", label: "", separator: true },
     {
@@ -1243,6 +1390,9 @@ export default function NexoApp({
                               void navigator.clipboard?.writeText(b.name);
                             }
                             if (id === "invite") void copyInviteLink(b);
+                            if (id === "edit" && canEditBoard(b)) {
+                              openEditBoard(b);
+                            }
                             if (id === "create" && vip) setShowCreate(true);
                           }}
                         >
@@ -1253,19 +1403,36 @@ export default function NexoApp({
                             }`}
                             onClick={() => selectBoard(b.id)}
                           >
-                            <span className="nexo-list-title">
-                              {b.name}
-                              {ownerRank === "vip" || ownerRank === "owner" ? (
-                                <span className="nexo-board-vip">
-                                  <RankBadge rank={ownerRank} />
+                            <span className="nexo-list-row">
+                              <span className="nexo-board-icon" aria-hidden>
+                                {b.icon_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={b.icon_url} alt="" />
+                                ) : (
+                                  <span className="nexo-board-icon-fallback">
+                                    #
+                                  </span>
+                                )}
+                              </span>
+                              <span className="nexo-list-text">
+                                <span className="nexo-list-title">
+                                  {b.name}
+                                  {ownerRank === "vip" ||
+                                  ownerRank === "owner" ? (
+                                    <span className="nexo-board-vip">
+                                      <RankBadge rank={ownerRank} />
+                                    </span>
+                                  ) : null}
                                 </span>
-                              ) : null}
-                            </span>
-                            <span className="muted nexo-list-meta">
-                              <span className={rankNameClass(ownerRank) || ""}>
-                                @{b.owner_name}
-                              </span>{" "}
-                              · {b.message_count} msg
+                                <span className="muted nexo-list-meta">
+                                  <span
+                                    className={rankNameClass(ownerRank) || ""}
+                                  >
+                                    @{b.owner_name}
+                                  </span>{" "}
+                                  · {b.message_count} msg
+                                </span>
+                              </span>
                             </span>
                           </button>
                         </AppContextMenu>
@@ -1449,22 +1616,42 @@ export default function NexoApp({
               <span>amigos · DMs requieren amistad si el peer lo exige</span>
             ) : tab === "boards" ? (
               activeBoard ? (
-                <span>
-                  {activeBoard.name}{" "}
-                  <span className="muted">@{activeBoard.owner_name}</span>
-                  {getRank({
-                    role: activeBoard.owner_role,
-                    username: activeBoard.owner_name,
-                    is_vip: activeBoard.owner_is_vip,
-                  }) ? (
-                    <RankBadge
-                      rank={getRank({
-                        role: activeBoard.owner_role,
-                        username: activeBoard.owner_name,
-                        is_vip: activeBoard.owner_is_vip,
-                      })}
-                    />
-                  ) : null}
+                <span className="nexo-chat-board-head">
+                  <span className="nexo-board-icon nexo-board-icon-sm" aria-hidden>
+                    {activeBoard.icon_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={activeBoard.icon_url} alt="" />
+                    ) : (
+                      <span className="nexo-board-icon-fallback">#</span>
+                    )}
+                  </span>
+                  <span>
+                    {activeBoard.name}{" "}
+                    <span className="muted">@{activeBoard.owner_name}</span>
+                    {getRank({
+                      role: activeBoard.owner_role,
+                      username: activeBoard.owner_name,
+                      is_vip: activeBoard.owner_is_vip,
+                    }) ? (
+                      <RankBadge
+                        rank={getRank({
+                          role: activeBoard.owner_role,
+                          username: activeBoard.owner_name,
+                          is_vip: activeBoard.owner_is_vip,
+                        })}
+                      />
+                    ) : null}
+                    {canEditBoard(activeBoard) ? (
+                      <button
+                        type="button"
+                        className="forum-mini-btn nexo-edit-board-btn"
+                        onClick={() => openEditBoard(activeBoard)}
+                        title="editar tablón e icono"
+                      >
+                        editar
+                      </button>
+                    ) : null}
+                  </span>
                 </span>
               ) : (
                 <span>elegí un tablón</span>
@@ -1979,7 +2166,7 @@ export default function NexoApp({
             ) : (
               <form onSubmit={createBoard} className="nexo-create-form">
                 <p className="muted nexo-create-hint">
-                  Un solo nombre y listo. Se crea el <strong>chat</strong> y
+                  Nombre + icono opcional. Se crea el <strong>chat</strong> y
                   también el board en el <strong>foro</strong> bajo{" "}
                   <Link href="/forum/nexo">// nexo</Link>.
                 </p>
@@ -2011,8 +2198,52 @@ export default function NexoApp({
                   </div>
                 )}
 
+                <label htmlFor="nb-icon">
+                  2. icono del tablón{" "}
+                  <span className="muted">(opcional)</span>
+                </label>
+                <div className="nexo-board-icon-picker">
+                  <span className="nexo-board-icon nexo-board-icon-lg" aria-hidden>
+                    {newIconPreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={newIconPreview} alt="" />
+                    ) : (
+                      <span className="nexo-board-icon-fallback">#</span>
+                    )}
+                  </span>
+                  <div className="nexo-board-icon-actions">
+                    <input
+                      id="nb-icon"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      disabled={iconUploading || sending}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] || null;
+                        void onCreateIconPick(f);
+                        e.target.value = "";
+                      }}
+                    />
+                    {newIconPreview ? (
+                      <button
+                        type="button"
+                        className="btn secondary"
+                        style={{ fontSize: "0.75rem", padding: "2px 8px" }}
+                        onClick={() => {
+                          setNewIconId(null);
+                          setNewIconPreview(null);
+                        }}
+                      >
+                        quitar
+                      </button>
+                    ) : null}
+                    {iconUploading ? (
+                      <span className="muted">subiendo…</span>
+                    ) : null}
+                  </div>
+                </div>
+
                 <label htmlFor="nb-desc">
-                  2. de qué va{" "}
+                  3. de qué va{" "}
                   <span className="muted">(opcional)</span>
                 </label>
                 <input
@@ -2024,7 +2255,7 @@ export default function NexoApp({
                 />
 
                 <label className="nexo-create-captcha-label">
-                  3. captcha anti-bots
+                  4. captcha anti-bots
                 </label>
                 <CaptchaField
                   disabled={sending}
@@ -2056,6 +2287,102 @@ export default function NexoApp({
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* modal editar board (icono + meta) */}
+      {showEditBoard && editBoardId != null && (
+        <div className="nexo-modal-backdrop" role="presentation">
+          <div
+            className="nexo-modal nexo-modal-create"
+            role="dialog"
+            aria-label="editar tablón"
+          >
+            <h2>editar tablón</h2>
+            <form onSubmit={saveEditBoard} className="nexo-create-form">
+              <label htmlFor="eb-name">nombre</label>
+              <input
+                id="eb-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                required
+                minLength={2}
+                maxLength={64}
+                autoComplete="off"
+              />
+
+              <label htmlFor="eb-icon">icono</label>
+              <div className="nexo-board-icon-picker">
+                <span className="nexo-board-icon nexo-board-icon-lg" aria-hidden>
+                  {editIconPreview && !editIconClear ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={editIconPreview} alt="" />
+                  ) : (
+                    <span className="nexo-board-icon-fallback">#</span>
+                  )}
+                </span>
+                <div className="nexo-board-icon-actions">
+                  <input
+                    id="eb-icon"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    disabled={iconUploading || editSaving}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] || null;
+                      void onEditIconPick(f);
+                      e.target.value = "";
+                    }}
+                  />
+                  {(editIconPreview || editIconId) && !editIconClear ? (
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      style={{ fontSize: "0.75rem", padding: "2px 8px" }}
+                      onClick={() => {
+                        setEditIconClear(true);
+                        setEditIconId(null);
+                        setEditIconPreview(null);
+                      }}
+                    >
+                      quitar icono
+                    </button>
+                  ) : null}
+                  {iconUploading ? (
+                    <span className="muted">subiendo…</span>
+                  ) : null}
+                </div>
+              </div>
+
+              <label htmlFor="eb-desc">descripción</label>
+              <input
+                id="eb-desc"
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                maxLength={400}
+                placeholder="una línea"
+              />
+
+              <div className="compose-toolbar">
+                <button
+                  className="btn"
+                  type="submit"
+                  disabled={editSaving || editName.trim().length < 2}
+                >
+                  {editSaving ? "guardando…" : "[ guardar ]"}
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => {
+                    setShowEditBoard(false);
+                    setEditBoardId(null);
+                  }}
+                >
+                  cancelar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
