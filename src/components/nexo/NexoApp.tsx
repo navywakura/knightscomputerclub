@@ -15,6 +15,7 @@ import AppContextMenu, {
 } from "@/components/ui/AppContextMenu";
 import RankBadge from "@/components/RankBadge";
 import CaptchaField from "@/components/CaptchaField";
+import NexoChatBody from "@/components/nexo/NexoChatBody";
 import VipThemePicker from "@/components/VipThemePicker";
 import WiredBootScreen, { WIRED_BOOT_MIN_MS } from "@/components/WiredBootScreen";
 import { nexoInviteUrl } from "@/lib/auth-redirect";
@@ -36,8 +37,29 @@ type Board = {
   description: string;
   owner_id: number;
   owner_name: string;
+  owner_is_vip?: boolean;
+  owner_role?: string;
   message_count: number;
   updated_at: string;
+};
+
+type BoardMember = {
+  id: number;
+  username: string;
+  display_name: string | null;
+  role: string;
+  is_vip: boolean;
+  online: boolean;
+};
+
+type FriendUser = {
+  friendship_id: number;
+  id: number;
+  username: string;
+  display_name: string | null;
+  role: string;
+  is_vip: boolean;
+  avatar_url: string | null;
 };
 
 type Msg = {
@@ -56,18 +78,24 @@ type DmThread = {
   updated_at: string;
 };
 
-type Tab = "boards" | "dm";
+type Tab = "boards" | "dm" | "friends";
 
 type Props = {
   /** slug de invitación (?join=) */
   initialJoinSlug?: string | null;
   /** abrir DM por notificación (?dm=threadId) */
   initialDmId?: number | null;
+  /** abrir board por id (?board=) */
+  initialBoardId?: number | null;
+  /** prefill DM open (?dm_user=) */
+  initialDmUser?: string | null;
 };
 
 export default function NexoApp({
   initialJoinSlug = null,
   initialDmId = null,
+  initialBoardId = null,
+  initialDmUser = null,
 }: Props) {
   const [me, setMe] = useState<Me | null>(null);
   const [tab, setTab] = useState<Tab>("boards");
@@ -75,10 +103,17 @@ export default function NexoApp({
   const [canCreate, setCanCreate] = useState(false);
   const [boardId, setBoardId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
+  const [members, setMembers] = useState<BoardMember[]>([]);
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+
+  // friends
+  const [friends, setFriends] = useState<FriendUser[]>([]);
+  const [incoming, setIncoming] = useState<FriendUser[]>([]);
+  const [outgoing, setOutgoing] = useState<FriendUser[]>([]);
+  const [friendUser, setFriendUser] = useState("");
 
   // create board
   const [showCreate, setShowCreate] = useState(false);
@@ -189,6 +224,41 @@ export default function NexoApp({
     }
   }, []);
 
+  const loadFriends = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/friends");
+      const d = await res.json();
+      if (!res.ok) return;
+      setFriends(d.friends || []);
+      setIncoming(d.incoming || []);
+      setOutgoing(d.outgoing || []);
+    } catch {
+      /* */
+    }
+  }, []);
+
+  const joinBoard = useCallback(async (id: number) => {
+    try {
+      await apiFetch("/api/nexo/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ board_id: id }),
+      });
+    } catch {
+      /* */
+    }
+  }, []);
+
+  const loadMembers = useCallback(async (id: number) => {
+    try {
+      const res = await apiFetch(`/api/nexo/members?board=${id}`);
+      const d = await res.json();
+      if (res.ok) setMembers(d.members || []);
+    } catch {
+      /* */
+    }
+  }, []);
+
   const loadDmMessages = useCallback(
     async (id: number, incremental = false) => {
       if (!dmUnlocked) return;
@@ -242,7 +312,7 @@ export default function NexoApp({
     (async () => {
       setLoading(true);
       await loadMe();
-      await loadBoards();
+      await Promise.all([loadBoards(), loadFriends()]);
       const elapsed =
         (typeof performance !== "undefined" ? performance.now() : Date.now()) -
         started;
@@ -253,7 +323,7 @@ export default function NexoApp({
     return () => {
       cancelled = true;
     };
-  }, [loadMe, loadBoards]);
+  }, [loadMe, loadBoards, loadFriends]);
 
   // invitación ?join=slug → prompt Unirse
   useEffect(() => {
@@ -295,6 +365,35 @@ export default function NexoApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, initialDmId]);
 
+  // ?board=id
+  useEffect(() => {
+    if (loading || !initialBoardId) return;
+    selectBoard(initialBoardId);
+    if (typeof window !== "undefined") {
+      const u = new URL(window.location.href);
+      if (u.searchParams.has("board")) {
+        u.searchParams.delete("board");
+        window.history.replaceState(null, "", u.pathname + u.search);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, initialBoardId]);
+
+  // ?dm_user= → abrir modal DM
+  useEffect(() => {
+    if (loading || !initialDmUser) return;
+    setTab("dm");
+    setShowDmOpen(true);
+    setDmOpenUser(initialDmUser);
+    if (typeof window !== "undefined") {
+      const u = new URL(window.location.href);
+      if (u.searchParams.has("dm_user")) {
+        u.searchParams.delete("dm_user");
+        window.history.replaceState(null, "", u.pathname + u.search);
+      }
+    }
+  }, [loading, initialDmUser]);
+
   function acceptInvite() {
     if (inviteBoard) {
       selectBoard(inviteBoard.id);
@@ -319,16 +418,19 @@ export default function NexoApp({
     }
   }
 
-  // poll board messages
+  // poll board messages + members
   useEffect(() => {
     if (tab !== "boards" || !boardId) return;
+    void joinBoard(boardId);
     loadMessages(boardId, false);
-    const iv = window.setInterval(
-      () => loadMessages(boardId, true),
-      NEXO_POLL_MS
-    );
+    void loadMembers(boardId);
+    const iv = window.setInterval(() => {
+      loadMessages(boardId, true);
+      void joinBoard(boardId);
+      void loadMembers(boardId);
+    }, NEXO_POLL_MS);
     return () => window.clearInterval(iv);
-  }, [tab, boardId, loadMessages]);
+  }, [tab, boardId, loadMessages, joinBoard, loadMembers]);
 
   // poll DMs
   useEffect(() => {
@@ -343,6 +445,14 @@ export default function NexoApp({
       return () => window.clearInterval(iv);
     }
   }, [tab, dmId, dmUnlocked, loadDmList, loadDmMessages]);
+
+  // friends list
+  useEffect(() => {
+    if (tab !== "friends") return;
+    void loadFriends();
+    const iv = window.setInterval(() => void loadFriends(), 15000);
+    return () => window.clearInterval(iv);
+  }, [tab, loadFriends]);
 
   async function createBoard(e: FormEvent) {
     e.preventDefault();
@@ -517,8 +627,33 @@ export default function NexoApp({
   function selectBoard(id: number) {
     setBoardId(id);
     setMessages([]);
+    setMembers([]);
     lastIdRef.current = 0;
     setTab("boards");
+    void joinBoard(id);
+  }
+
+  async function friendAction(
+    action: string,
+    extra: Record<string, unknown> = {}
+  ) {
+    setError("");
+    try {
+      const res = await apiFetch("/api/friends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...extra }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error || "error amigos");
+        return;
+      }
+      setFriendUser("");
+      await loadFriends();
+    } catch {
+      setError("red caída");
+    }
   }
 
   function selectDm(id: number) {
@@ -552,6 +687,8 @@ export default function NexoApp({
 
   const msgCtx: ContextMenuItem[] = [
     { id: "copy_msg", label: "copiar mensaje" },
+    { id: "mention", label: "mencionar…" },
+    { id: "friend", label: "solicitud de amistad…" },
     { id: "dm_author", label: "DM al autor…" },
   ];
 
@@ -592,9 +729,26 @@ export default function NexoApp({
           >
             DM
           </button>
+          <button
+            type="button"
+            className={tab === "friends" ? "on" : ""}
+            onClick={() => {
+              setTab("friends");
+              void loadFriends();
+            }}
+          >
+            amigos{incoming.length ? ` (${incoming.length})` : ""}
+          </button>
         </div>
         <div className="nexo-actions">
           <VipThemePicker user={me} />
+          <Link
+            href="/settings"
+            className="forum-chip"
+            title="configuración de perfil"
+          >
+            settings
+          </Link>
           {tab === "boards" && (
             <button
               type="button"
@@ -651,11 +805,19 @@ export default function NexoApp({
         </div>
       )}
 
-      <div className="nexo-grid">
+      <div
+        className={`nexo-grid${
+          tab === "boards" && boardId ? " has-members" : ""
+        }`}
+      >
         {/* sidebar */}
         <aside className="nexo-side">
           <div className="forum-pane-head">
-            {tab === "boards" ? "tablones // nexo" : "mensajes privados"}
+            {tab === "boards"
+              ? "tablones // nexo"
+              : tab === "dm"
+                ? "mensajes privados"
+                : "amigos"}
           </div>
           <div className="forum-pane-body">
             {tab === "boards" ? (
@@ -680,7 +842,13 @@ export default function NexoApp({
                         : " un VIP debe crear el primero."}
                     </li>
                   ) : (
-                    boards.map((b) => (
+                    boards.map((b) => {
+                      const ownerRank = getRank({
+                        role: b.owner_role,
+                        username: b.owner_name,
+                        is_vip: b.owner_is_vip,
+                      });
+                      return (
                       <li key={b.id}>
                         <AppContextMenu
                           items={boardCtxFor(b)}
@@ -700,22 +868,33 @@ export default function NexoApp({
                             }`}
                             onClick={() => selectBoard(b.id)}
                           >
-                            <span className="nexo-list-title">{b.name}</span>
+                            <span className="nexo-list-title">
+                              {b.name}
+                              {ownerRank === "vip" || ownerRank === "owner" ? (
+                                <span className="nexo-board-vip">
+                                  <RankBadge rank={ownerRank} />
+                                </span>
+                              ) : null}
+                            </span>
                             <span className="muted nexo-list-meta">
-                              @{b.owner_name} · {b.message_count} msg
+                              <span className={rankNameClass(ownerRank) || ""}>
+                                @{b.owner_name}
+                              </span>{" "}
+                              · {b.message_count} msg
                             </span>
                           </button>
                         </AppContextMenu>
                       </li>
-                    ))
+                      );
+                    })
                   )}
                 </ul>
               </AppContextMenu>
-            ) : (
+            ) : tab === "dm" ? (
               <ul className="nexo-list">
                 {dmThreads.length === 0 ? (
                   <li className="muted forum-pad">
-                    sin DMs. abrí uno con username + PIN de 4 dígitos.
+                    sin DMs. abrí uno con un amigo (según privacidad) + PIN.
                   </li>
                 ) : (
                   dmThreads.map((t) => (
@@ -729,6 +908,13 @@ export default function NexoApp({
                       >
                         <span className="nexo-list-title">
                           @{t.peer?.username || "?"}
+                          {t.peer?.is_vip || t.peer?.role === "owner" ? (
+                            <RankBadge
+                              role={t.peer?.role}
+                              username={t.peer?.username}
+                              isVip={t.peer?.is_vip}
+                            />
+                          ) : null}
                         </span>
                         <span className="muted nexo-list-meta">
                           <FontAwesomeIcon
@@ -743,6 +929,119 @@ export default function NexoApp({
                   ))
                 )}
               </ul>
+            ) : (
+              <div className="forum-pad">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void friendAction("request", { username: friendUser });
+                  }}
+                  style={{ marginBottom: 12 }}
+                >
+                  <label htmlFor="nexo-friend">solicitud</label>
+                  <div className="settings-inline">
+                    <input
+                      id="nexo-friend"
+                      value={friendUser}
+                      onChange={(e) => setFriendUser(e.target.value)}
+                      placeholder="@usuario"
+                      required
+                    />
+                    <button className="btn" type="submit">
+                      +
+                    </button>
+                  </div>
+                </form>
+                {incoming.length > 0 && (
+                  <>
+                    <p className="muted" style={{ fontSize: "0.8rem" }}>
+                      entrantes
+                    </p>
+                    <ul className="nexo-list">
+                      {incoming.map((f) => (
+                        <li key={f.friendship_id} className="forum-pad">
+                          @{f.username}{" "}
+                          <RankBadge
+                            role={f.role}
+                            username={f.username}
+                            isVip={f.is_vip}
+                          />
+                          <div className="settings-inline" style={{ marginTop: 6 }}>
+                            <button
+                              type="button"
+                              className="btn"
+                              style={{ fontSize: "0.75rem", padding: "2px 8px" }}
+                              onClick={() =>
+                                void friendAction("accept", {
+                                  friendship_id: f.friendship_id,
+                                })
+                              }
+                            >
+                              ok
+                            </button>
+                            <button
+                              type="button"
+                              className="btn secondary"
+                              style={{ fontSize: "0.75rem", padding: "2px 8px" }}
+                              onClick={() =>
+                                void friendAction("reject", {
+                                  friendship_id: f.friendship_id,
+                                })
+                              }
+                            >
+                              no
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                <p className="muted" style={{ fontSize: "0.8rem" }}>
+                  amigos ({friends.length})
+                </p>
+                <ul className="nexo-list">
+                  {friends.length === 0 ? (
+                    <li className="muted forum-pad">sin amigos.</li>
+                  ) : (
+                    friends.map((f) => (
+                      <li key={f.friendship_id}>
+                        <button
+                          type="button"
+                          className="nexo-list-item"
+                          onClick={() => {
+                            setTab("dm");
+                            setShowDmOpen(true);
+                            setDmOpenUser(f.username);
+                          }}
+                        >
+                          <span className="nexo-list-title">
+                            @{f.username}{" "}
+                            <RankBadge
+                              role={f.role}
+                              username={f.username}
+                              isVip={f.is_vip}
+                            />
+                          </span>
+                          <span className="muted nexo-list-meta">
+                            abrir DM
+                          </span>
+                        </button>
+                      </li>
+                    ))
+                  )}
+                </ul>
+                {outgoing.length > 0 && (
+                  <p className="muted" style={{ fontSize: "0.75rem", marginTop: 8 }}>
+                    pendientes: {outgoing.map((o) => `@${o.username}`).join(", ")}
+                  </p>
+                )}
+                <p style={{ marginTop: 10 }}>
+                  <Link href="/settings?tab=friends" className="muted">
+                    ver en settings →
+                  </Link>
+                </p>
+              </div>
             )}
           </div>
         </aside>
@@ -750,11 +1049,26 @@ export default function NexoApp({
         {/* chat */}
         <section className="nexo-chat">
           <div className="forum-pane-head">
-            {tab === "boards" ? (
+            {tab === "friends" ? (
+              <span>amigos · DMs requieren amistad si el peer lo exige</span>
+            ) : tab === "boards" ? (
               activeBoard ? (
                 <span>
                   {activeBoard.name}{" "}
                   <span className="muted">@{activeBoard.owner_name}</span>
+                  {getRank({
+                    role: activeBoard.owner_role,
+                    username: activeBoard.owner_name,
+                    is_vip: activeBoard.owner_is_vip,
+                  }) ? (
+                    <RankBadge
+                      rank={getRank({
+                        role: activeBoard.owner_role,
+                        username: activeBoard.owner_name,
+                        is_vip: activeBoard.owner_is_vip,
+                      })}
+                    />
+                  ) : null}
                 </span>
               ) : (
                 <span>elegí un tablón</span>
@@ -776,7 +1090,19 @@ export default function NexoApp({
             )}
           </div>
 
-          {tab === "dm" && dmId && !dmUnlocked ? (
+          {tab === "friends" ? (
+            <div className="forum-pad muted">
+              <p>
+                Gestioná solicitudes a la izquierda. Para chatear, abrí un DM
+                con un amigo. Si su privacidad es «solo amigos», no podrás
+                abrir DM hasta que acepte la solicitud.
+              </p>
+              <p>
+                También en{" "}
+                <Link href="/settings?tab=friends">/settings → amigos</Link>.
+              </p>
+            </div>
+          ) : tab === "dm" && dmId && !dmUnlocked ? (
             <form className="nexo-pin-form forum-pad" onSubmit={unlockDm}>
               <p className="muted">
                 Este DM está protegido. Ingresá el PIN de 4 dígitos que
@@ -807,8 +1133,8 @@ export default function NexoApp({
                 (tab === "dm" && !dmId) ? (
                   <p className="muted forum-pad">
                     {tab === "boards"
-                      ? "seleccioná un board a la izquierda. click derecho = menú de la app."
-                      : "seleccioná un DM o creá uno nuevo."}
+                      ? "seleccioná un board a la izquierda. click derecho = menú de la app. @user = mención."
+                      : "seleccioná un DM o creá uno nuevo (gate de amigos si el peer lo exige)."}
                   </p>
                 ) : chatMsgs.length === 0 ? (
                   <p className="muted forum-pad">sin mensajes. escribí el primero.</p>
@@ -830,6 +1156,16 @@ export default function NexoApp({
                         onSelect={(id) => {
                           if (id === "copy_msg") {
                             void navigator.clipboard?.writeText(m.body);
+                          }
+                          if (id === "mention") {
+                            setText((t) =>
+                              `${t}${t && !t.endsWith(" ") ? " " : ""}@${m.author_name} `
+                            );
+                          }
+                          if (id === "friend") {
+                            void friendAction("request", {
+                              username: m.author_name,
+                            });
                           }
                           if (id === "dm_author") {
                             setTab("dm");
@@ -856,7 +1192,10 @@ export default function NexoApp({
                                 {new Date(m.created_at).toLocaleString()}
                               </span>
                             </header>
-                            <div className="nexo-msg-body">{m.body}</div>
+                            <NexoChatBody
+                              body={m.body}
+                              myUsername={me?.username}
+                            />
                           </div>
                         </article>
                       </AppContextMenu>
@@ -877,7 +1216,7 @@ export default function NexoApp({
                     placeholder={
                       tab === "dm"
                         ? "mensaje privado…"
-                        : "mensaje al tablón…"
+                        : "mensaje · @user para mencionar…"
                     }
                     maxLength={4000}
                     disabled={sending}
@@ -895,6 +1234,62 @@ export default function NexoApp({
             </>
           )}
         </section>
+
+        {/* member list del board */}
+        {tab === "boards" && boardId ? (
+          <aside className="nexo-members">
+            <div className="forum-pane-head">
+              miembros · {members.filter((m) => m.online).length} online
+            </div>
+            <ul className="nexo-members-list">
+              {members.length === 0 ? (
+                <li className="muted forum-pad" style={{ fontSize: "0.8rem" }}>
+                  uniéndote al canal…
+                </li>
+              ) : (
+                members.map((m) => {
+                  const rank = getRank({
+                    role: m.role,
+                    username: m.username,
+                    is_vip: m.is_vip,
+                  });
+                  return (
+                    <li key={m.id} className="nexo-member">
+                      <span
+                        className={`nexo-member-dot${m.online ? " on" : ""}`}
+                        title={m.online ? "online" : "offline"}
+                      />
+                      <button
+                        type="button"
+                        className="linkish"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          color: "inherit",
+                          cursor: "pointer",
+                          textAlign: "left",
+                        }}
+                        title={`mencionar @${m.username}`}
+                        onClick={() =>
+                          setText(
+                            (t) =>
+                              `${t}${t && !t.endsWith(" ") ? " " : ""}@${m.username} `
+                          )
+                        }
+                      >
+                        <span className={rankNameClass(rank) || ""}>
+                          @{m.username}
+                        </span>
+                      </button>
+                      {rank ? <RankBadge rank={rank} /> : null}
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          </aside>
+        ) : null}
       </div>
 
       {/* invitación a tablón */}
@@ -1007,8 +1402,8 @@ export default function NexoApp({
           <div className="nexo-modal" role="dialog" aria-label="abrir DM">
             <h2>mensaje privado</h2>
             <p className="muted">
-              Elegí un username y un PIN de 4 dígitos. Ambos deben acordarse del
-              PIN para leer el chat. No se puede recuperar.
+              Username + PIN de 4 dígitos. Si el usuario solo acepta DMs de
+              amigos, debés ser amigo primero (pestaña amigos / settings).
             </p>
             <form onSubmit={openDm}>
               <label htmlFor="dm-user">username</label>
@@ -1037,6 +1432,19 @@ export default function NexoApp({
               <div className="compose-toolbar">
                 <button className="btn" type="submit" disabled={sending}>
                   [ open DM ]
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => {
+                    if (dmOpenUser.trim()) {
+                      void friendAction("request", {
+                        username: dmOpenUser,
+                      });
+                    }
+                  }}
+                >
+                  [ + amigo ]
                 </button>
                 <button
                   type="button"

@@ -1,19 +1,48 @@
-# Electron shell (futuro)
+# Electron shell — KCC Nexo
 
-La UI de **Nexo** y el menú contextual (`AppContextMenu`) están en React
-y evitan menús nativos del SO. Para empaquetar como app de escritorio:
+La UI de **Nexo** se carga desde producción
+(`https://www.knightscomputer.club/nexo`). El backend sigue en Next/Vercel.
 
-1. **Renderer**: reutilizar componentes de `src/components/nexo` y
-   `src/components/ui` sin cambios de UI.
-2. **API**: en web van a Next (`/api/nexo/*`). En Electron, apuntar
-   `apiFetch` (`src/lib/platform.ts`) al mismo backend HTTPS de
-   knightscomputer.club o a un proceso local.
-3. **Storage**: `getStorage` / `getLocalStorage` usan Web Storage; en
-   Electron el mismo renderer Chromium las soporta.
-4. **Auth**: cookies de sesión (`credentials: "include"`) o token
-   inyectado vía `window.electronAPI` (extender `platform.ts`).
-5. **No** uses `dialog.showMessageBox` para menús de la app: mantener
-   `AppContextMenu` para look & feel unificado.
+## Actualizaciones automáticas (dos capas)
 
-Crear boards bajo `// nexo` sigue siendo **exclusivo [VIP]** en el API
-(`canCreateNexoBoard`), independientemente del shell.
+### 1. UI / API web (siempre fresca)
+
+El shell **no empaqueta** React/Next. Al abrir la app (o con
+*Recargar web*) se pide de nuevo el sitio con `Cache-Control: no-cache`.
+Cualquier deploy a Vercel se ve en Electron **sin reinstalar**.
+
+### 2. Shell binario (electron-updater)
+
+`electron-updater` comprueba **GitHub Releases** del repo
+`navywakura/knightscomputerclub` al arrancar y cada 6 h.
+
+Para publicar un update del `.exe`:
+
+```bash
+cd electron
+npm version patch   # o editar version en package.json
+npm run dist:win
+# subir el release + latest.yml a GitHub Releases (tag vX.Y.Z)
+```
+
+Con token `GH_TOKEN` / `GH_TOKEN` de GitHub, `electron-builder` puede
+publicar solo:
+
+```bash
+GH_TOKEN=… npx electron-builder --win --publish always
+```
+
+## Build local
+
+```bash
+cd electron
+npm install
+npm start              # dev
+npm run dist:win       # instalador + portable en dist/
+```
+
+## Notas
+
+- Menú contextual de la app: `AppContextMenu` (no nativo del SO).
+- Crear boards = **[VIP]** (`canCreateNexoBoard`).
+- Notificaciones desktop: Notification API del Chromium embebido + campana in-app.

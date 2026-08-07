@@ -83,12 +83,16 @@ export default function Header() {
                 <NotificationCenter
                   enabled
                   apiBase="/api/notifications"
-                  pollMs={15000}
+                  pollMs={8000}
+                  desktopNotify
                   onNavigate={(href) => {
                     router.push(href);
                     router.refresh();
                   }}
                 />
+                <Link href="/settings" className="user-settings-link">
+                  [settings]
+                </Link>
                 <button type="button" onClick={logout}>
                   [logout]
                 </button>
@@ -127,6 +131,7 @@ export default function Header() {
               else items.push(nexoItem);
             }
             items.push({ href: "/forum/new", label: "new_thread" });
+            items.push({ href: "/settings", label: "settings" });
           }
           if (user && isOwnerUser(user)) {
             items.push({ href: "/admin", label: "admin" });

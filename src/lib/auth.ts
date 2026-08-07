@@ -1,7 +1,12 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
-import { getDb, type PublicUser, type UserRow } from "./db";
+import {
+  getDb,
+  type PublicUser,
+  type UserConnections,
+  type UserRow,
+} from "./db";
 
 const COOKIE_NAME = "kc_session";
 const MAX_AGE = 60 * 60 * 24 * 14; // 14 days
@@ -65,39 +70,99 @@ export async function getSessionUser(): Promise<PublicUser | null> {
 
     const db = getDb();
     const rows = await db`
-      SELECT id, username, role, is_vip, banned, created_at
+      SELECT
+        id, username, email, role, is_vip, banned, created_at,
+        display_name, avatar_media_id, banner_media_id, dm_privacy, bio,
+        email_verified, deleted_at, connections
       FROM users
       WHERE id = ${id}
       LIMIT 1
     `;
     if (!rows[0]) return null;
-    const u = rows[0] as {
-      id: number;
-      username: string;
-      role: string;
-      is_vip: boolean;
-      banned: boolean;
-      created_at: string;
+    const u = rows[0] as UserRow & {
+      display_name: string | null;
+      avatar_media_id: number | null;
+      banner_media_id: number | null;
+      dm_privacy: string | null;
+      bio: string | null;
+      email_verified: boolean;
+      deleted_at: string | null;
+      connections: unknown;
     };
-    // ban → sesión inválida (no puede actuar)
+    // ban → sesión inválida
     if (u.banned) {
       await clearSessionCookie().catch(() => {});
       return null;
     }
-    return {
+    // soft-delete vencido → purgar sesión (hard delete en ensureSchema/login)
+    if (u.deleted_at) {
+      const deadline = new Date(u.deleted_at).getTime() + 7 * 86400_000;
+      if (Date.now() > deadline) {
+        await clearSessionCookie().catch(() => {});
+        return null;
+      }
+    }
+    return toPublicUser({
       id: u.id,
       username: u.username,
+      email: String(u.email || ""),
+      password_hash: "",
       role: u.role,
       is_vip: Boolean(u.is_vip),
       banned: Boolean(u.banned),
       created_at: String(u.created_at),
-    };
+      display_name: u.display_name,
+      avatar_media_id: u.avatar_media_id,
+      banner_media_id: u.banner_media_id,
+      dm_privacy: u.dm_privacy,
+      bio: u.bio,
+      email_verified: Boolean(u.email_verified),
+      deleted_at: u.deleted_at,
+      connections: u.connections as UserConnections | null,
+    });
   } catch {
     return null;
   }
 }
 
+export function parseConnections(raw: unknown): UserConnections {
+  if (!raw) return {};
+  let obj: Record<string, unknown> = {};
+  if (typeof raw === "string") {
+    try {
+      obj = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  } else if (typeof raw === "object") {
+    obj = raw as Record<string, unknown>;
+  } else {
+    return {};
+  }
+  const out: UserConnections = {};
+  const keys = ["github", "twitter", "website", "discord", "youtube"] as const;
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === "string" && v.trim()) {
+      out[k] = v.trim().slice(0, 200);
+    }
+  }
+  return out;
+}
+
 export function toPublicUser(row: UserRow): PublicUser {
+  const privacy =
+    row.dm_privacy === "friends" ? "friends" : "everyone";
+  const deletedAt = row.deleted_at ? String(row.deleted_at) : null;
+  let pending_deletion = false;
+  let deletion_deadline: string | null = null;
+  if (deletedAt) {
+    const d = new Date(deletedAt).getTime() + 7 * 86400_000;
+    if (Date.now() <= d) {
+      pending_deletion = true;
+      deletion_deadline = new Date(d).toISOString();
+    }
+  }
   return {
     id: row.id,
     username: row.username,
@@ -105,7 +170,55 @@ export function toPublicUser(row: UserRow): PublicUser {
     is_vip: Boolean(row.is_vip),
     banned: Boolean(row.banned),
     created_at: String(row.created_at),
+    display_name: row.display_name ? String(row.display_name) : null,
+    avatar_url: row.avatar_media_id
+      ? `/api/media/${row.avatar_media_id}`
+      : null,
+    banner_url: row.banner_media_id
+      ? `/api/media/${row.banner_media_id}`
+      : null,
+    dm_privacy: privacy,
+    bio: row.bio ? String(row.bio).slice(0, 100) : "",
+    connections: parseConnections(row.connections),
+    email_verified: Boolean(row.email_verified),
+    email: row.email ? String(row.email) : undefined,
+    pending_deletion,
+    deletion_deadline,
   };
+}
+
+/** Acciones que requieren email verificado */
+export function requireVerified(
+  user: PublicUser | null
+): { ok: true } | { ok: false; error: string; code: string } {
+  if (!user) {
+    return { ok: false, error: "login requerido", code: "auth" };
+  }
+  if (user.pending_deletion) {
+    return {
+      ok: false,
+      error:
+        "cuenta en proceso de eliminación. Hacé login de nuevo para restaurarla, o esperá el plazo de 7 días.",
+      code: "pending_deletion",
+    };
+  }
+  if (!user.email_verified) {
+    return {
+      ok: false,
+      error:
+        "verificá tu email (OTP) en /settings para publicar, chatear en nexo o enviar solicitudes de amistad.",
+      code: "email_unverified",
+    };
+  }
+  return { ok: true };
+}
+
+export function displayLabel(user: {
+  username: string;
+  display_name?: string | null;
+}): string {
+  const d = user.display_name?.trim();
+  return d || user.username;
 }
 
 export function sanitizeUsername(raw: string) {

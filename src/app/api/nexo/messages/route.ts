@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, requireVerified } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
+import { extractMentions, resolveMentionUserIds } from "@/lib/mentions";
 import { NEXO_MSG_MAX } from "@/lib/nexo";
+import { safeNotifyMany } from "@/lib/notify";
 
 export async function GET(req: Request) {
   try {
@@ -70,8 +72,15 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user || user.banned) {
-      return NextResponse.json({ error: "login requerido" }, { status: 401 });
+    const gate = requireVerified(user);
+    if (!gate.ok) {
+      return NextResponse.json(
+        { error: gate.error, code: gate.code },
+        { status: gate.code === "auth" ? 401 : 403 }
+      );
+    }
+    if (user!.banned) {
+      return NextResponse.json({ error: "baneado" }, { status: 403 });
     }
     const body = await req.json().catch(() => ({}));
     const boardId = Number(body.board_id || body.board);
@@ -97,20 +106,59 @@ export async function POST(req: Request) {
 
     const rows = await db`
       INSERT INTO nexo_messages (board_id, author_id, body)
-      VALUES (${boardId}, ${user.id}, ${text})
+      VALUES (${boardId}, ${user!.id}, ${text})
       RETURNING id, board_id, author_id, body, created_at
     `;
     await db`
       UPDATE nexo_boards SET updated_at = NOW() WHERE id = ${boardId}
     `;
+    // presencia en el board
+    await db`
+      INSERT INTO nexo_board_members (board_id, user_id, joined_at, last_seen)
+      VALUES (${boardId}, ${user!.id}, NOW(), NOW())
+      ON CONFLICT (board_id, user_id)
+      DO UPDATE SET last_seen = NOW()
+    `;
+
+    // @menciones → notificaciones
+    const names = extractMentions(text);
+    if (names.length) {
+      const targets = await resolveMentionUserIds(db, names, user!.id);
+      if (targets.length) {
+        const boardMeta = await db`
+          SELECT slug, name FROM nexo_boards WHERE id = ${boardId} LIMIT 1
+        `;
+        const bname = boardMeta[0]
+          ? String(boardMeta[0].name)
+          : `board #${boardId}`;
+        const excerpt =
+          text.length > 120 ? text.slice(0, 119).trimEnd() + "…" : text;
+        await safeNotifyMany(
+          targets.map((t) => t.id),
+          {
+            type: "nexo.mention",
+            title: `@${user!.username} te mencionó en ${bname}`,
+            body: excerpt,
+            href: `/nexo?board=${boardId}`,
+            actorId: user!.id,
+            actorLabel: user!.username,
+            payload: {
+              boardId,
+              messageId: Number(rows[0].id),
+              kind: "mention",
+            },
+          }
+        );
+      }
+    }
 
     return NextResponse.json(
       {
         message: {
           ...rows[0],
-          author_name: user.username,
-          author_role: user.role,
-          author_is_vip: user.is_vip,
+          author_name: user!.username,
+          author_role: user!.role,
+          author_is_vip: user!.is_vip,
         },
       },
       { status: 201 }

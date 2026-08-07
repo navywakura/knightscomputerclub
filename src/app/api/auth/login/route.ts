@@ -26,7 +26,10 @@ export async function POST(req: Request) {
     const db = getDb();
 
     const rows = await db`
-      SELECT id, username, email, password_hash, role, is_vip, banned, created_at
+      SELECT
+        id, username, email, password_hash, role, is_vip, banned, created_at,
+        display_name, avatar_media_id, dm_privacy, bio,
+        email_verified, deleted_at
       FROM users
       WHERE username = ${login} OR email = ${login}
       LIMIT 1
@@ -54,11 +57,36 @@ export async function POST(req: Request) {
       );
     }
 
+    // Soft-delete: restaurar si < 7 días, bloquear si venció
+    let restored = false;
+    if (row.deleted_at) {
+      const deadline =
+        new Date(String(row.deleted_at)).getTime() + 7 * 86400_000;
+      if (Date.now() > deadline) {
+        await db`DELETE FROM users WHERE id = ${row.id}`;
+        return NextResponse.json(
+          { error: "cuenta eliminada definitivamente" },
+          { status: 403 }
+        );
+      }
+      await db`
+        UPDATE users SET deleted_at = NULL WHERE id = ${row.id}
+      `;
+      row.deleted_at = null;
+      restored = true;
+    }
+
     const user = toPublicUser(row);
     const token = await createSessionToken(user);
     await setSessionCookie(token);
 
-    return NextResponse.json({ user });
+    return NextResponse.json({
+      user,
+      restored,
+      message: restored
+        ? "cuenta restaurada (cancelaste la eliminación de 7 días)"
+        : undefined,
+    });
   } catch (e) {
     console.error("[login]", e);
     return NextResponse.json(

@@ -23,9 +23,15 @@ export function getLocalStorage(): Storage | null {
 
 export function isDesktopShell(): boolean {
   if (typeof window === "undefined") return false;
-  // Electron suele inyectar process.versions.electron o userAgent custom
-  const w = window as Window & { electronAPI?: unknown };
-  return Boolean(w.electronAPI);
+  const w = window as Window & {
+    electronAPI?: { isNexoDesktop?: boolean };
+  };
+  if (w.electronAPI?.isNexoDesktop) return true;
+  // fallback userAgent (main.js añade NexoDesktop)
+  if (typeof navigator !== "undefined" && /NexoDesktop/i.test(navigator.userAgent)) {
+    return true;
+  }
+  return false;
 }
 
 export async function apiFetch(

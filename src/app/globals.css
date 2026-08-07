@@ -3679,6 +3679,15 @@ body.nexo-app-active footer {
   background: color-mix(in srgb, var(--bg-deep, #020403) 80%, transparent);
 }
 
+.captcha-canvas {
+  display: block;
+  border: 1px dashed var(--border);
+  border-radius: 2px;
+  background: #0a0e0c;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
 .captcha-input {
   width: 4.5rem !important;
   text-align: center;
@@ -3695,4 +3704,264 @@ body.nexo-app-active footer {
 .captcha-hint {
   margin: 4px 0 0;
   font-size: 0.75rem;
+}
+
+/* --- settings --- */
+.settings-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+}
+
+.settings-app {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-title {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  letter-spacing: 0.04em;
+  margin: 0;
+  color: var(--green);
+}
+
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border: 1px solid var(--border);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.settings-tabs button {
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 8px 14px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.settings-tabs button:last-child {
+  border-right: none;
+}
+
+.settings-tabs button.on {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--border);
+  padding: 14px 16px 18px;
+  background: color-mix(in srgb, var(--bg-panel, #0a100c) 90%, transparent);
+}
+
+.settings-form label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-top: 8px;
+}
+
+.settings-form input,
+.settings-form textarea,
+.settings-form select {
+  width: 100%;
+}
+
+.settings-sub {
+  margin: 18px 0 4px;
+  font-size: 0.95rem;
+  color: var(--amber);
+}
+
+.settings-banner {
+  min-height: 110px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.55)),
+    color-mix(in srgb, var(--green) 8%, #050807);
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  margin: -4px -4px 8px;
+}
+
+.settings-banner-actions {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+}
+
+.settings-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.settings-avatar,
+.settings-friend-av {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: #0a100c;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  text-transform: uppercase;
+  font-size: 1.1rem;
+  color: var(--green);
+  flex-shrink: 0;
+}
+
+.settings-friend-av {
+  width: 36px;
+  height: 36px;
+  font-size: 0.75rem;
+}
+
+.settings-avatar img,
+.settings-friend-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.settings-file-btn {
+  font-size: 0.8rem !important;
+  padding: 4px 10px !important;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.settings-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-inline input {
+  flex: 1;
+  min-width: 140px;
+}
+
+.settings-user-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-user-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+}
+
+.settings-friend-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-radio {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 !important;
+  cursor: pointer;
+  color: var(--text) !important;
+}
+
+.settings-radio input {
+  width: auto !important;
+}
+
+/* nexo members + mentions */
+.nexo-grid.has-members {
+  grid-template-columns: minmax(180px, 240px) 1fr minmax(150px, 200px);
+}
+
+@media (max-width: 960px) {
+  .nexo-grid.has-members {
+    grid-template-columns: 1fr;
+  }
+}
+
+.nexo-members {
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: color-mix(in srgb, var(--bg-deep, #020403) 70%, transparent);
+}
+
+.nexo-members-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  flex: 1;
+}
+
+.nexo-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+}
+
+.nexo-member-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.nexo-member-dot.on {
+  background: var(--green);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--green) 60%, transparent);
+}
+
+.nexo-mention {
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 18%, transparent);
+  border-radius: 3px;
+  padding: 0 3px;
+  font-weight: 600;
+}
+
+.nexo-msg-body.ping-me {
+  box-shadow: inset 3px 0 0 var(--amber);
+  padding-left: 6px;
+}
+
+.nexo-board-vip {
+  font-size: 0.7rem;
+  margin-left: 4px;
+}
+
+.user-settings-link {
+  margin-left: 4px;
+  font-size: 0.85rem;
 }

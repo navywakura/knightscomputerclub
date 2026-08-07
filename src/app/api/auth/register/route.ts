@@ -9,6 +9,7 @@ import {
   toPublicUser,
 } from "@/lib/auth";
 import { ensureSchema, getDb, type UserRow } from "@/lib/db";
+import { issueEmailOtp } from "@/lib/otp";
 
 export async function POST(req: Request) {
   try {
@@ -49,20 +50,43 @@ export async function POST(req: Request) {
     }
 
     const password_hash = await hashPassword(password);
-    const role =
-      username === "roger" || email === "rogynavarro@gmail.com"
-        ? "owner"
-        : "member";
+    const isOwner =
+      username === "roger" || email === "rogynavarro@gmail.com";
+    const role = isOwner ? "owner" : "member";
     const rows = await db`
-      INSERT INTO users (username, email, password_hash, role)
-      VALUES (${username}, ${email}, ${password_hash}, ${role})
-      RETURNING id, username, email, password_hash, role, is_vip, banned, created_at
+      INSERT INTO users (username, email, password_hash, role, email_verified)
+      VALUES (${username}, ${email}, ${password_hash}, ${role}, ${isOwner})
+      RETURNING
+        id, username, email, password_hash, role, is_vip, banned, created_at,
+        display_name, avatar_media_id, dm_privacy, bio,
+        email_verified, deleted_at
     `;
     const user = toPublicUser(rows[0] as UserRow);
     const token = await createSessionToken(user);
     await setSessionCookie(token);
 
-    return NextResponse.json({ user }, { status: 201 });
+    // OTP de verificación (owner ya verified)
+    if (!isOwner) {
+      const otp = await issueEmailOtp(db, {
+        id: user.id,
+        email,
+        username,
+      });
+      if (!otp.ok) {
+        console.warn("[register] OTP no enviado:", otp.error);
+      }
+    }
+
+    return NextResponse.json(
+      {
+        user,
+        needs_verification: !user.email_verified,
+        message: user.email_verified
+          ? undefined
+          : "revisá tu email y verificá con el código OTP en /settings",
+      },
+      { status: 201 }
+    );
   } catch (e) {
     console.error("[register]", e);
     return NextResponse.json(

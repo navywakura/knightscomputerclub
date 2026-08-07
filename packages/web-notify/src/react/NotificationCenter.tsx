@@ -13,6 +13,11 @@ export type NotificationCenterProps = {
   className?: string;
   /** Llamado al navegar a un href de notificación */
   onNavigate?: (href: string) => void;
+  /**
+   * Si true, muestra Notification API del SO cuando hay unread nuevos
+   * y la pestaña no está visible (navegador + Electron).
+   */
+  desktopNotify?: boolean;
 };
 
 type InboxResponse = {
@@ -31,12 +36,15 @@ export function NotificationCenter({
   enabled = true,
   className = "",
   onNavigate,
+  desktopNotify = false,
 }: NotificationCenterProps) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationRecord[]>([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const lastUnreadRef = useRef(0);
+  const primedRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!enabled) return;
@@ -51,12 +59,47 @@ export function NotificationCenter({
       }
       const data = (await res.json()) as InboxResponse;
       if (!res.ok) return;
-      setItems(data.items || []);
-      setUnread(Number(data.unread || 0));
+      const nextItems = data.items || [];
+      const nextUnread = Number(data.unread || 0);
+      setItems(nextItems);
+      setUnread(nextUnread);
+
+      if (desktopNotify && typeof window !== "undefined" && "Notification" in window) {
+        if (!primedRef.current) {
+          primedRef.current = true;
+          lastUnreadRef.current = nextUnread;
+        } else if (
+          nextUnread > lastUnreadRef.current &&
+          document.visibilityState !== "visible" &&
+          Notification.permission === "granted"
+        ) {
+          const fresh = nextItems.find((x) => !x.read_at) || nextItems[0];
+          try {
+            const n = new Notification(
+              fresh?.title || "Nueva notificación",
+              {
+                body: fresh?.body || "knightscomputer.club",
+                tag: "kcc-web-notify",
+              }
+            );
+            n.onclick = () => {
+              window.focus();
+              if (fresh?.href) {
+                if (onNavigate) onNavigate(fresh.href);
+                else window.location.href = fresh.href;
+              }
+              n.close();
+            };
+          } catch {
+            /* */
+          }
+        }
+        lastUnreadRef.current = nextUnread;
+      }
     } catch {
       /* red */
     }
-  }, [apiBase, enabled]);
+  }, [apiBase, enabled, desktopNotify, onNavigate]);
 
   useEffect(() => {
     if (!enabled) return;

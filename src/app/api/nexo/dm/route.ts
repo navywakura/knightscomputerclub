@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, requireVerified } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
+import { canOpenDm } from "@/lib/friends";
 import {
   hashPin,
   isValidPin,
@@ -111,9 +112,17 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user || user.banned) {
-      return NextResponse.json({ error: "login requerido" }, { status: 401 });
+    const gate = requireVerified(user);
+    if (!gate.ok) {
+      return NextResponse.json(
+        { error: gate.error, code: gate.code },
+        { status: gate.code === "auth" ? 401 : 403 }
+      );
     }
+    if (user!.banned) {
+      return NextResponse.json({ error: "baneado" }, { status: 403 });
+    }
+    const me = user!;
     const body = await req.json().catch(() => ({}));
     const action = String(body.action || "open");
 
@@ -138,7 +147,7 @@ export async function POST(req: Request) {
           SELECT id, pin_hash, user_low, user_high
           FROM nexo_dm_threads
           WHERE id = ${threadId}
-            AND (user_low = ${user.id} OR user_high = ${user.id})
+            AND (user_low = ${me.id} OR user_high = ${me.id})
           LIMIT 1
         `;
         if (!thr[0]) {
@@ -156,7 +165,7 @@ export async function POST(req: Request) {
         .trim()
         .toLowerCase()
         .replace(/^@/, "");
-      if (!username || username === user.username.toLowerCase()) {
+      if (!username || username === me.username.toLowerCase()) {
         return NextResponse.json(
           { error: "username de otro usuario requerido" },
           { status: 400 }
@@ -171,7 +180,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "usuario no encontrado" }, { status: 404 });
       }
       const peerId = Number(peers[0].id);
-      const [low, high] = orderedUserPair(user.id, peerId);
+      // privacidad DMs del destinatario (everyone | friends)
+      const allowed = await canOpenDm(db, me.id, peerId);
+      if (!allowed.ok) {
+        return NextResponse.json(
+          { error: allowed.error, code: "dm_privacy" },
+          { status: 403 }
+        );
+      }
+
+      const [low, high] = orderedUserPair(me.id, peerId);
 
       const existing = await db`
         SELECT id, pin_hash FROM nexo_dm_threads
@@ -197,7 +215,7 @@ export async function POST(req: Request) {
       const pin_hash = await hashPin(pin);
       const created = await db`
         INSERT INTO nexo_dm_threads (user_low, user_high, pin_hash, created_by)
-        VALUES (${low}, ${high}, ${pin_hash}, ${user.id})
+        VALUES (${low}, ${high}, ${pin_hash}, ${me.id})
         RETURNING id
       `;
       return NextResponse.json(
@@ -227,7 +245,7 @@ export async function POST(req: Request) {
         SELECT id, pin_hash, user_low, user_high
         FROM nexo_dm_threads
         WHERE id = ${threadId}
-          AND (user_low = ${user.id} OR user_high = ${user.id})
+          AND (user_low = ${me.id} OR user_high = ${me.id})
         LIMIT 1
       `;
       if (!thr[0]) {
@@ -240,7 +258,7 @@ export async function POST(req: Request) {
 
       const rows = await db`
         INSERT INTO nexo_dm_messages (thread_id, author_id, body)
-        VALUES (${threadId}, ${user.id}, ${text})
+        VALUES (${threadId}, ${me.id}, ${text})
         RETURNING id, thread_id, author_id, body, created_at
       `;
       await db`
@@ -249,7 +267,7 @@ export async function POST(req: Request) {
 
       // notificar al otro participante
       const peerId =
-        Number(thr[0].user_low) === user.id
+        Number(thr[0].user_low) === me.id
           ? Number(thr[0].user_high)
           : Number(thr[0].user_low);
       const excerpt =
@@ -257,11 +275,11 @@ export async function POST(req: Request) {
       await safeNotify({
         userId: peerId,
         type: "nexo.dm",
-        title: `DM de @${user.username}`,
+        title: `DM de @${me.username}`,
         body: excerpt,
         href: `/nexo?dm=${threadId}`,
-        actorId: user.id,
-        actorLabel: user.username,
+        actorId: me.id,
+        actorLabel: me.username,
         payload: { threadId, messageId: Number(rows[0].id) },
       });
 
@@ -269,7 +287,7 @@ export async function POST(req: Request) {
         {
           message: {
             ...rows[0],
-            author_name: user.username,
+            author_name: me.username,
           },
         },
         { status: 201 }

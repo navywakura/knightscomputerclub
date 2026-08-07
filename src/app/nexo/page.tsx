@@ -15,7 +15,12 @@ export const metadata: Metadata = {
 };
 
 type Props = {
-  searchParams: Promise<{ join?: string; dm?: string }>;
+  searchParams: Promise<{
+    join?: string;
+    dm?: string;
+    board?: string;
+    dm_user?: string;
+  }>;
 };
 
 export default async function NexoPage({ searchParams }: Props) {
@@ -23,12 +28,18 @@ export default async function NexoPage({ searchParams }: Props) {
   const join = (sp.join || "").trim();
   const dmRaw = (sp.dm || "").trim();
   const dmId = dmRaw && /^\d+$/.test(dmRaw) ? Number(dmRaw) : null;
+  const boardRaw = (sp.board || "").trim();
+  const boardId =
+    boardRaw && /^\d+$/.test(boardRaw) ? Number(boardRaw) : null;
+  const dmUser = (sp.dm_user || "").trim().replace(/^@/, "") || null;
 
   const user = await getSessionUser().catch(() => null);
   if (!user || user.banned) {
     let next = "/nexo";
     if (join) next = nexoInvitePath(join);
     else if (dmId) next = `/nexo?dm=${dmId}`;
+    else if (boardId) next = `/nexo?board=${boardId}`;
+    else if (dmUser) next = `/nexo?dm_user=${encodeURIComponent(dmUser)}`;
     redirect(`/auth/login?next=${encodeURIComponent(next)}`);
   }
 
@@ -36,6 +47,8 @@ export default async function NexoPage({ searchParams }: Props) {
     <NexoApp
       initialJoinSlug={join || null}
       initialDmId={dmId}
+      initialBoardId={boardId}
+      initialDmUser={dmUser}
     />
   );
 }

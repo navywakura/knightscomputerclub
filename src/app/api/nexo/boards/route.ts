@@ -108,12 +108,20 @@ export async function POST(req: Request) {
       VALUES (${slug}, ${name}, ${description}, ${user.id})
       RETURNING id, slug, name, description, owner_id, created_at, updated_at
     `;
+    const boardId = Number(rows[0].id);
+    await db`
+      INSERT INTO nexo_board_members (board_id, user_id, joined_at, last_seen)
+      VALUES (${boardId}, ${user.id}, NOW(), NOW())
+      ON CONFLICT (board_id, user_id) DO NOTHING
+    `;
 
     return NextResponse.json(
       {
         board: {
           ...rows[0],
           owner_name: user.username,
+          owner_is_vip: user.is_vip,
+          owner_role: user.role,
           message_count: 0,
         },
       },

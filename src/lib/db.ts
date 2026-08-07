@@ -161,6 +161,81 @@ export async function ensureSchema() {
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS dm_pin_hash TEXT
   `;
+  // Perfil público
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS display_name VARCHAR(64)
+  `;
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS avatar_media_id INT REFERENCES media(id) ON DELETE SET NULL
+  `;
+  // DMs: everyone | friends
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS dm_privacy VARCHAR(16) NOT NULL DEFAULT 'everyone'
+  `;
+  // Bio corta (máx 100 en app)
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS bio VARCHAR(100) NOT NULL DEFAULT ''
+  `;
+  // Banner de perfil (solo VIP / owner en API)
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS banner_media_id INT REFERENCES media(id) ON DELETE SET NULL
+  `;
+  // Conexiones externas (github, twitter/x, website, discord, …)
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS connections JSONB NOT NULL DEFAULT '{}'::jsonb
+  `;
+  // Verificación email + soft delete (7 días)
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE
+  `;
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS email_otp_hash TEXT
+  `;
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS email_otp_expires TIMESTAMPTZ
+  `;
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_users_deleted_at
+      ON users (deleted_at)
+      WHERE deleted_at IS NOT NULL
+  `;
+
+  // Amistades
+  await db`
+    CREATE TABLE IF NOT EXISTS friendships (
+      id SERIAL PRIMARY KEY,
+      requester_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      addressee_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status VARCHAR(16) NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (requester_id, addressee_id),
+      CHECK (requester_id <> addressee_id),
+      CHECK (status IN ('pending', 'accepted', 'rejected'))
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_friendships_requester ON friendships(requester_id)
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON friendships(addressee_id)
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_friendships_status ON friendships(status)
+  `;
 
   // ── NEXO: tablones de usuario + chat casi real-time + DMs ──
   await db`
@@ -195,6 +270,21 @@ export async function ensureSchema() {
       ON nexo_messages(board_id, id DESC)
   `;
 
+  // Miembros por board (lista lateral + presencia)
+  await db`
+    CREATE TABLE IF NOT EXISTS nexo_board_members (
+      board_id INT NOT NULL REFERENCES nexo_boards(id) ON DELETE CASCADE,
+      user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (board_id, user_id)
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_nexo_board_members_seen
+      ON nexo_board_members (board_id, last_seen DESC)
+  `;
+
   await db`
     CREATE TABLE IF NOT EXISTS nexo_dm_threads (
       id SERIAL PRIMARY KEY,
@@ -224,10 +314,28 @@ export async function ensureSchema() {
   // Seed / upsert categorías (incluye jerarquía offtopic + nexo)
   await seedCategories(db);
 
+  // Purga soft-deletes vencidos
+  try {
+    await db`
+      DELETE FROM users
+      WHERE deleted_at IS NOT NULL
+        AND deleted_at < NOW() - INTERVAL '7 days'
+    `;
+  } catch {
+    /* */
+  }
+
   // Owner del nodo: roger / rogynavarro@gmail.com
   await db`
     UPDATE users
     SET role = 'owner'
+    WHERE lower(username) = 'roger'
+       OR lower(email) = 'rogynavarro@gmail.com'
+  `;
+  // Owner siempre verificado
+  await db`
+    UPDATE users
+    SET email_verified = TRUE
     WHERE lower(username) = 'roger'
        OR lower(email) = 'rogynavarro@gmail.com'
   `;
@@ -345,6 +453,14 @@ async function seedCategories(db: NeonQueryFunction<false, false>) {
   }
 }
 
+export type UserConnections = {
+  github?: string;
+  twitter?: string;
+  website?: string;
+  discord?: string;
+  youtube?: string;
+};
+
 export type UserRow = {
   id: number;
   username: string;
@@ -354,6 +470,14 @@ export type UserRow = {
   is_vip: boolean;
   banned: boolean;
   created_at: string;
+  display_name?: string | null;
+  avatar_media_id?: number | null;
+  banner_media_id?: number | null;
+  dm_privacy?: string | null;
+  bio?: string | null;
+  email_verified?: boolean;
+  deleted_at?: string | null;
+  connections?: UserConnections | string | null;
 };
 
 export type PublicUser = {
@@ -363,6 +487,16 @@ export type PublicUser = {
   is_vip: boolean;
   banned: boolean;
   created_at: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  banner_url: string | null;
+  dm_privacy: "everyone" | "friends";
+  bio: string;
+  connections: UserConnections;
+  email_verified: boolean;
+  email?: string;
+  pending_deletion?: boolean;
+  deletion_deadline?: string | null;
 };
 
 export type CategoryRow = {

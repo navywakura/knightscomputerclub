@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, requireVerified } from "@/lib/auth";
 import { verifyCaptcha } from "@/lib/captcha";
 import { ensureSchema, getDb } from "@/lib/db";
 import { previewsForPosts, type LinkPreview } from "@/lib/link-preview";
@@ -77,8 +77,12 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) {
-      return NextResponse.json({ error: "login requerido" }, { status: 401 });
+    const gate = requireVerified(user);
+    if (!gate.ok) {
+      return NextResponse.json(
+        { error: gate.error, code: gate.code },
+        { status: gate.code === "auth" ? 401 : 403 }
+      );
     }
 
     const body = await req.json();
