@@ -84,6 +84,10 @@ export async function POST(req: Request) {
         { status: gate.code === "auth" ? 401 : 403 }
       );
     }
+    const me = user!;
+    if (me.banned) {
+      return NextResponse.json({ error: "baneado" }, { status: 403 });
+    }
 
     const body = await req.json();
     const threadId = Number(body.thread_id || body.thread);
@@ -122,7 +126,7 @@ export async function POST(req: Request) {
 
     const posts = await db`
       INSERT INTO posts (thread_id, author_id, body)
-      VALUES (${threadId}, ${user.id}, ${content})
+      VALUES (${threadId}, ${me.id}, ${content})
       RETURNING id, thread_id, author_id, body, created_at, updated_at
     `;
 
@@ -139,7 +143,7 @@ export async function POST(req: Request) {
     for (const row of participants) {
       recipientIds.add(Number(row.author_id));
     }
-    recipientIds.delete(user.id);
+    recipientIds.delete(me.id);
 
     const postId = Number(posts[0].id);
     const title = String(threads[0].title || `thread #${threadId}`);
@@ -149,10 +153,10 @@ export async function POST(req: Request) {
     await safeNotifyMany([...recipientIds], {
       type: "forum.reply",
       title: `respuesta en: ${title.slice(0, 80)}`,
-      body: `@${user.username}: ${excerpt}`,
+      body: `@${me.username}: ${excerpt}`,
       href: `/forum/post/${postId}`,
-      actorId: user.id,
-      actorLabel: user.username,
+      actorId: me.id,
+      actorLabel: me.username,
       payload: { threadId, postId },
     });
 
@@ -160,9 +164,9 @@ export async function POST(req: Request) {
       {
         post: {
           ...posts[0],
-          author_name: user.username,
-          author_role: user.role,
-          author_is_vip: user.is_vip,
+          author_name: me.username,
+          author_role: me.role,
+          author_is_vip: me.is_vip,
         },
       },
       { status: 201 }

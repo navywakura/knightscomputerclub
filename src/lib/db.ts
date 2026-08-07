@@ -269,6 +269,36 @@ export async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_nexo_messages_board
       ON nexo_messages(board_id, id DESC)
   `;
+  // extras chat: reply, pin, edit, soft-delete
+  await db`
+    ALTER TABLE nexo_messages
+    ADD COLUMN IF NOT EXISTS reply_to_id INT REFERENCES nexo_messages(id) ON DELETE SET NULL
+  `;
+  await db`
+    ALTER TABLE nexo_messages
+    ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT FALSE
+  `;
+  await db`
+    ALTER TABLE nexo_messages
+    ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ
+  `;
+  await db`
+    ALTER TABLE nexo_messages
+    ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT FALSE
+  `;
+  await db`
+    ALTER TABLE nexo_messages
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_nexo_messages_pinned
+      ON nexo_messages (board_id, id DESC)
+      WHERE pinned IS TRUE AND deleted IS NOT TRUE
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_nexo_messages_updated
+      ON nexo_messages (board_id, updated_at DESC)
+  `;
 
   // Miembros por board (lista lateral + presencia)
   await db`
@@ -309,6 +339,26 @@ export async function ensureSchema() {
   await db`
     CREATE INDEX IF NOT EXISTS idx_nexo_dm_messages_thread
       ON nexo_dm_messages(thread_id, id DESC)
+  `;
+  await db`
+    ALTER TABLE nexo_dm_messages
+    ADD COLUMN IF NOT EXISTS reply_to_id INT REFERENCES nexo_dm_messages(id) ON DELETE SET NULL
+  `;
+  await db`
+    ALTER TABLE nexo_dm_messages
+    ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT FALSE
+  `;
+  await db`
+    ALTER TABLE nexo_dm_messages
+    ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ
+  `;
+  await db`
+    ALTER TABLE nexo_dm_messages
+    ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT FALSE
+  `;
+  await db`
+    ALTER TABLE nexo_dm_messages
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   `;
 
   // Seed / upsert categorías (incluye jerarquía offtopic + nexo)

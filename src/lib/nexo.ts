@@ -7,6 +7,25 @@ export const NEXO_POLL_MS = 2500;
 export const NEXO_MSG_MAX = 4000;
 export const NEXO_BOARD_NAME_MAX = 64;
 export const NEXO_SLUG_MAX = 48;
+/** Ventana de edición de mensajes (10 horas) */
+export const NEXO_EDIT_WINDOW_MS = 10 * 60 * 60 * 1000;
+
+export function canEditMessageByAge(createdAt: string | Date): boolean {
+  const t =
+    typeof createdAt === "string"
+      ? new Date(createdAt).getTime()
+      : createdAt.getTime();
+  if (!Number.isFinite(t)) return false;
+  return Date.now() - t <= NEXO_EDIT_WINDOW_MS;
+}
+
+export function messageExcerpt(body: string, max = 120): string {
+  const t = String(body || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (t.length <= max) return t;
+  return t.slice(0, max - 1).trimEnd() + "…";
+}
 
 export function canCreateNexoBoard(user: {
   is_vip?: boolean | null;

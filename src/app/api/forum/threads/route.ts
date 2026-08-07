@@ -78,6 +78,10 @@ export async function POST(req: Request) {
         { status: gate.code === "auth" ? 401 : 403 }
       );
     }
+    const me = user!;
+    if (me.banned) {
+      return NextResponse.json({ error: "baneado" }, { status: 403 });
+    }
 
     const body = await req.json();
     const categorySlug = String(body.category || body.category_slug || "").trim();
@@ -131,14 +135,14 @@ export async function POST(req: Request) {
 
     const threads = await db`
       INSERT INTO threads (category_id, author_id, title)
-      VALUES (${categoryId}, ${user.id}, ${title})
+      VALUES (${categoryId}, ${me.id}, ${title})
       RETURNING id, category_id, author_id, title, locked, sticky, created_at, updated_at
     `;
     const thread = threads[0];
 
     await db`
       INSERT INTO posts (thread_id, author_id, body)
-      VALUES (${thread.id}, ${user.id}, ${content})
+      VALUES (${thread.id}, ${me.id}, ${content})
     `;
 
     return NextResponse.json({ thread }, { status: 201 });
