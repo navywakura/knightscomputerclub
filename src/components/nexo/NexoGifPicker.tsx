@@ -30,7 +30,7 @@ export default function NexoGifPicker({ onPick, disabled }: Props) {
     try {
       const params = new URLSearchParams({ limit: "24" });
       if (query.trim()) params.set("q", query.trim());
-      const res = await apiFetch(`/api/tenor?${params}`);
+      const res = await apiFetch(`/api/gifs?${params}`);
       const d = await res.json();
       if (!res.ok) {
         setError(d.error || "error GIF");
@@ -72,7 +72,7 @@ export default function NexoGifPicker({ onPick, disabled }: Props) {
         type="button"
         className="btn secondary nexo-compose-tool"
         disabled={disabled}
-        title="GIF (Tenor)"
+        title="GIF (Giphy)"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
@@ -84,7 +84,7 @@ export default function NexoGifPicker({ onPick, disabled }: Props) {
             className="nexo-gif-search"
             value={q}
             onChange={(e) => onQuery(e.target.value)}
-            placeholder="buscar en Tenor…"
+            placeholder="buscar en Giphy…"
             autoFocus
           />
           {error ? <div className="form-error nexo-gif-err">{error}</div> : null}
@@ -111,7 +111,7 @@ export default function NexoGifPicker({ onPick, disabled }: Props) {
               ))}
             </div>
           )}
-          <p className="muted nexo-gif-credit">powered by Tenor</p>
+          <p className="muted nexo-gif-credit">Powered by GIPHY</p>
         </div>
       ) : null}
     </div>

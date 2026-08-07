@@ -1252,7 +1252,7 @@ export default function NexoApp({
                       placeholder={
                         tab === "dm"
                           ? "mensaje privado… emoji · GIF · PDF"
-                          : "mensaje · emoji · GIF Tenor · PDF · @user"
+                          : "mensaje · emoji · GIF Giphy · PDF · @user"
                       }
                       maxLength={4000}
                       disabled={sending}

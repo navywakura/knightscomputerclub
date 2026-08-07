@@ -43,6 +43,11 @@ export default function NexoChatBody({
 
 function isSafeImgUrl(src: string): boolean {
   if (src.startsWith("/api/media/")) return true;
+  // Giphy CDN
+  if (/^https:\/\/([a-z0-9.-]+\.)?giphy\.com\//i.test(src)) return true;
+  if (/^https:\/\/media\d*\.giphy\.com\//i.test(src)) return true;
+  if (src.startsWith("https://i.giphy.com/")) return true;
+  // legacy Tenor embeds (mensajes viejos)
   if (/^https:\/\/([a-z0-9.-]+\.)?tenor\.com\//i.test(src)) return true;
   if (src.startsWith("https://media.tenor.com/")) return true;
   if (src.startsWith("https://c.tenor.com/")) return true;
@@ -137,6 +142,7 @@ function renderLine(line: string, lineKey: number, me: string): ReactNode[] {
         continue;
       }
       const isGif =
+        /giphy\.com/i.test(p.src) ||
         /tenor\.com/i.test(p.src) ||
         /\.gif(\?|$)/i.test(p.src) ||
         /gif/i.test(p.alt);
