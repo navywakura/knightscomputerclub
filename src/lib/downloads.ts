@@ -42,9 +42,17 @@ const winPortableName = versions.artifacts.winPortable.replace(
   "{version}",
   ELECTRON_VER
 );
+const macArm64Name = (
+  versions.artifacts.macArm64 || "KCC-Nexo-{version}-arm64.dmg"
+).replace("{version}", ELECTRON_VER);
+const macX64Name = (
+  versions.artifacts.macX64 || "KCC-Nexo-{version}-x64.dmg"
+).replace("{version}", ELECTRON_VER);
 
 const WIN_SETUP = `${GH_RELEASES}/download/${GH_TAG}/${winSetupName}`;
 const WIN_PORTABLE = `${GH_RELEASES}/download/${GH_TAG}/${winPortableName}`;
+const MAC_ARM64 = `${GH_RELEASES}/download/${GH_TAG}/${macArm64Name}`;
+const MAC_X64 = `${GH_RELEASES}/download/${GH_TAG}/${macX64Name}`;
 const CLI_TGZ = `${GH_RELEASES}/download/${GH_TAG}/kcc-cli-${CLI_VER}.tgz`;
 const CLI_REPO =
   `https://github.com/${GH_OWNER}/${GH_REPO}/tree/main/packages/kcc-cli`;
@@ -76,9 +84,17 @@ export const DOWNLOAD_PLATFORMS: DownloadPlatform[] = [
     id: "macos",
     name: "macOS",
     subtitle: "KCC Nexo · Electron (Apple Silicon / Intel)",
-    status: "soon",
+    status: "ready",
     logo: "macos",
-    notes: "DMG en preparación. Mientras tanto usá la web en Safari/Chrome.",
+    version: ELECTRON_VER,
+    cta: "Descargar Apple Silicon (.dmg)",
+    href: MAC_ARM64,
+    alt: [
+      { label: "Intel (.dmg)", href: MAC_X64 },
+      { label: "Todas las releases", href: GH_LATEST },
+    ],
+    notes:
+      "App de escritorio para // nexo. M1/M2/M3/M4 → Apple Silicon; Mac antiguos → Intel. Sin firma de Apple: clic derecho en la app → Abrir la primera vez (o xattr -cr en Terminal). Auto-update vía GitHub Releases.",
   },
   {
     id: "linux",

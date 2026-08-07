@@ -8,6 +8,9 @@
   "artifacts": {
     "winSetup": "KCC-Nexo-Setup-{version}.exe",
     "winPortable": "KCC-Nexo-Portable-{version}.exe",
-    "latestYml": "latest.yml"
+    "macArm64": "KCC-Nexo-{version}-arm64.dmg",
+    "macX64": "KCC-Nexo-{version}-x64.dmg",
+    "latestYml": "latest.yml",
+    "latestMacYml": "latest-mac.yml"
   }
 }

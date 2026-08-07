@@ -33,7 +33,13 @@ Opcional: `export GH_TOKEN=…` si no usás la sesión de `gh`.
 | `npm run release -- --skip-build` | Usa `electron/dist/*` ya generado |
 | `npm run release -- --skip-cli` | Sin tarball de kcc-cli |
 | `npm run release -- --skip-electron` | Solo CLI (+ web version) |
+| `npm run release -- --skip-win` | No buildea Windows |
+| `npm run release -- --skip-mac` | No buildea macOS DMG |
 | `npm run release -- --notes "fix"` | Notas custom del release |
+
+> **macOS DMG:** se generan solo si el host es **Darwin** (tu MacBook).
+> En el M1: `arm64` nativo + `x64` (cross-compile Electron). Windows se
+> puede seguir buildeando desde el Mac con electron-builder.
 
 ## Flujo recomendado cada minor (1.3.0, 1.4.0, …)
 
@@ -55,10 +61,13 @@ git push origin main
 
 ## Qué se sube al tag `vX.Y.Z`
 
-- `KCC-Nexo-Setup-X.Y.Z.exe` — instalador
-- `KCC-Nexo-Setup-X.Y.Z.exe.blockmap` — auto-update
-- `KCC-Nexo-Portable-X.Y.Z.exe` — portable
-- `latest.yml` — **electron-updater** (imprescindible)
+- `KCC-Nexo-Setup-X.Y.Z.exe` — instalador Windows
+- `KCC-Nexo-Setup-X.Y.Z.exe.blockmap` — auto-update Windows
+- `KCC-Nexo-Portable-X.Y.Z.exe` — portable Windows
+- `latest.yml` — **electron-updater** Windows (imprescindible)
+- `KCC-Nexo-X.Y.Z-arm64.dmg` — macOS Apple Silicon (si se buildeó en Mac)
+- `KCC-Nexo-X.Y.Z-x64.dmg` — macOS Intel
+- `latest-mac.yml` — **electron-updater** macOS
 - `kcc-cli-X.Y.Z.tgz` — package instalable con npm
 
 ## Instalar CLI desde el release

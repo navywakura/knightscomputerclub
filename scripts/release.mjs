@@ -89,6 +89,8 @@ const NO_PUBLISH = hasFlag("--no-publish") || DRY;
 const SKIP_BUILD = hasFlag("--skip-build");
 const SKIP_CLI = hasFlag("--skip-cli");
 const SKIP_ELECTRON = hasFlag("--skip-electron");
+const SKIP_WIN = hasFlag("--skip-win");
+const SKIP_MAC = hasFlag("--skip-mac");
 const WEB_ONLY = hasFlag("--web-only");
 const YES = hasFlag("--yes") || hasFlag("-y");
 const NOTES = flagValue("--notes") || "";
@@ -172,8 +174,26 @@ function artifactPaths(version) {
   const portable = join(DIST_DIR, `KCC-Nexo-Portable-${version}.exe`);
   const blockmap = join(DIST_DIR, `KCC-Nexo-Setup-${version}.exe.blockmap`);
   const latest = join(DIST_DIR, "latest.yml");
-  return { setup, portable, blockmap, latest };
+  // macOS (Apple Silicon + Intel) — solo se generan en Darwin
+  const dmgArm64 = join(DIST_DIR, `KCC-Nexo-${version}-arm64.dmg`);
+  const dmgX64 = join(DIST_DIR, `KCC-Nexo-${version}-x64.dmg`);
+  const dmgArm64Blockmap = join(DIST_DIR, `KCC-Nexo-${version}-arm64.dmg.blockmap`);
+  const dmgX64Blockmap = join(DIST_DIR, `KCC-Nexo-${version}-x64.dmg.blockmap`);
+  const latestMac = join(DIST_DIR, "latest-mac.yml");
+  return {
+    setup,
+    portable,
+    blockmap,
+    latest,
+    dmgArm64,
+    dmgX64,
+    dmgArm64Blockmap,
+    dmgX64Blockmap,
+    latestMac,
+  };
 }
+
+const IS_DARWIN = process.platform === "darwin";
 
 function ensureTools({ needBuild, needPublish }) {
   if (!which("node")) die("node no encontrado");
@@ -210,21 +230,68 @@ function applyVersions(version) {
 }
 
 function buildElectron(version) {
-  log("\n── build Electron (win nsis + portable) ──");
-  // limpia latest.yml viejo confunde si falla a medias
-  run("npx electron-builder --win --publish never", {
-    cwd: ELECTRON_DIR,
-    env: {
-      // evita que intente publicar
-      GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN || "",
-    },
-  });
+  const doWin = !SKIP_WIN;
+  const doMac = !SKIP_MAC && IS_DARWIN;
 
-  const { setup, portable, latest } = artifactPaths(version);
+  if (!doWin && !doMac) {
+    die(
+      "nada que buildear: --skip-win y macOS deshabilitado (o no estás en Darwin). Usá un Mac para DMG o quitá --skip-win."
+    );
+  }
+
+  const envBase = {
+    GH_TOKEN: process.env.GH_TOKEN || process.env.GITHUB_TOKEN || "",
+    // sin Apple Developer cert: no fallar buscando identity
+    CSC_IDENTITY_AUTO_DISCOVERY: "false",
+  };
+
+  if (doWin) {
+    log("\n── build Electron (win nsis + portable) ──");
+    run("npx electron-builder --win --publish never", {
+      cwd: ELECTRON_DIR,
+      env: envBase,
+    });
+  } else {
+    log("\n→ --skip-win: no se buildea Windows");
+  }
+
+  if (doMac) {
+    // secuencial: en paralelo hdiutil pelea por /Volumes/KCC Nexo …
+    log("\n── build Electron (mac dmg arm64) ──");
+    run("npx electron-builder --mac --arm64 --publish never", {
+      cwd: ELECTRON_DIR,
+      env: envBase,
+    });
+    log("\n── build Electron (mac dmg x64) ──");
+    run("npx electron-builder --mac --x64 --publish never", {
+      cwd: ELECTRON_DIR,
+      env: envBase,
+    });
+  } else if (!SKIP_MAC && !IS_DARWIN) {
+    log(
+      "\n→ macOS DMG omitido (este host no es Darwin). Buildeá en un Mac con: cd electron && npm run dist:mac:all"
+    );
+  } else if (SKIP_MAC) {
+    log("\n→ --skip-mac: no se buildea macOS");
+  }
+
+  const { setup, portable, latest, dmgArm64, dmgX64, latestMac } =
+    artifactPaths(version);
   if (!DRY) {
-    if (!existsSync(setup)) die(`falta artefacto: ${setup}`);
-    if (!existsSync(portable)) die(`falta artefacto: ${portable}`);
-    if (!existsSync(latest)) die(`falta latest.yml (auto-update)`);
+    if (doWin) {
+      if (!existsSync(setup)) die(`falta artefacto: ${setup}`);
+      if (!existsSync(portable)) die(`falta artefacto: ${portable}`);
+      if (!existsSync(latest)) die(`falta latest.yml (auto-update)`);
+    }
+    if (doMac) {
+      if (!existsSync(dmgArm64)) die(`falta artefacto: ${dmgArm64}`);
+      if (!existsSync(dmgX64)) die(`falta artefacto: ${dmgX64}`);
+      if (!existsSync(latestMac)) {
+        log(
+          `⚠ sin latest-mac.yml (${latestMac}) — auto-update mac puede fallar`
+        );
+      }
+    }
   }
   log("✓ build listo en electron/dist/");
 }
@@ -257,15 +324,27 @@ function packCli(version) {
   return tgzPath;
 }
 
-function releaseNotes(version, { cliTgz }) {
+function releaseNotes(version, { cliTgz, hasMac = false }) {
   if (NOTES) return NOTES;
-  return [
-    `## KCC ${version}`,
-    ``,
+  const desktop = [
     `### Desktop (Electron)`,
     `- KCC-Nexo-Setup-${version}.exe — instalador Windows x64`,
     `- KCC-Nexo-Portable-${version}.exe — portable`,
-    `- Auto-update: \`latest.yml\` (electron-updater)`,
+    `- Auto-update Windows: \`latest.yml\` (electron-updater)`,
+  ];
+  if (hasMac) {
+    desktop.push(
+      `- KCC-Nexo-${version}-arm64.dmg — macOS Apple Silicon (M1/M2/M3/M4)`,
+      `- KCC-Nexo-${version}-x64.dmg — macOS Intel`,
+      `- Auto-update macOS: \`latest-mac.yml\``,
+      ``,
+      `**macOS sin firma de Apple:** al abrir la primera vez, clic derecho → Abrir (o \`xattr -cr "/Applications/KCC Nexo.app"\`).`
+    );
+  }
+  return [
+    `## KCC ${version}`,
+    ``,
+    ...desktop,
     ``,
     `### CLI`,
     cliTgz
@@ -294,14 +373,40 @@ function releaseNotes(version, { cliTgz }) {
 function publishGithub(version, versionsMeta, cliTgz) {
   const tag = `v${version}`;
   const { owner, repo } = versionsMeta.github;
-  const { setup, portable, blockmap, latest } = artifactPaths(version);
+  const {
+    setup,
+    portable,
+    blockmap,
+    latest,
+    dmgArm64,
+    dmgX64,
+    dmgArm64Blockmap,
+    dmgX64Blockmap,
+    latestMac,
+  } = artifactPaths(version);
 
   const assets = [];
+  let hasMac = false;
   if (!SKIP_ELECTRON) {
-    for (const p of [setup, portable, blockmap, latest]) {
-      if (existsSync(p)) assets.push(p);
-      else if (p === blockmap) log(`⚠ sin blockmap (${p}), se sigue`);
-      else if (!DRY) die(`asset requerido ausente: ${p}`);
+    if (!SKIP_WIN) {
+      for (const p of [setup, portable, blockmap, latest]) {
+        if (existsSync(p)) assets.push(p);
+        else if (p === blockmap) log(`⚠ sin blockmap (${p}), se sigue`);
+        else if (!DRY) die(`asset requerido ausente: ${p}`);
+      }
+    }
+    // mac: opcionales si no se buildearon en este host
+    for (const p of [
+      dmgArm64,
+      dmgX64,
+      dmgArm64Blockmap,
+      dmgX64Blockmap,
+      latestMac,
+    ]) {
+      if (existsSync(p)) {
+        assets.push(p);
+        if (p === dmgArm64 || p === dmgX64) hasMac = true;
+      }
     }
   }
   if (cliTgz && existsSync(cliTgz)) assets.push(cliTgz);
@@ -309,7 +414,7 @@ function publishGithub(version, versionsMeta, cliTgz) {
   if (assets.length === 0 && !DRY) die("no hay assets para subir");
 
   const notesFile = join(ROOT, `.release-notes-${version}.md`);
-  const body = releaseNotes(version, { cliTgz });
+  const body = releaseNotes(version, { cliTgz, hasMac });
   if (!DRY) writeFileSync(notesFile, body, "utf8");
 
   log(`\n── GitHub Release ${tag} (${owner}/${repo}) ──`);

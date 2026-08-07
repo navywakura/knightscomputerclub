@@ -29,8 +29,9 @@ Manual (solo Electron):
 ```bash
 cd electron
 npm version 1.3.0 --no-git-tag-version
-npm run dist:win
-# subir dist/* + latest.yml al tag v1.3.0
+npm run dist:win       # Windows
+npm run dist:mac:all   # macOS arm64 + x64 (solo en Mac)
+# subir dist/* + latest.yml + latest-mac.yml al tag v1.3.0
 ```
 
 ## Build local
@@ -40,7 +41,22 @@ cd electron
 npm install
 npm start              # dev
 npm run dist:win       # instalador + portable en dist/
+npm run dist:mac:all   # DMG Apple Silicon + Intel (requiere macOS)
+npm run dist:mac:arm64 # solo M1/M2/M3/M4
+npm run dist:mac:x64   # solo Intel
 ```
+
+### macOS sin certificado Apple
+
+Los DMG se firman con `identity: null` (unsigned). Gatekeeper bloqueará
+el primer arranque:
+
+1. Abrí el DMG → arrastrá **KCC Nexo** a Aplicaciones
+2. Clic derecho en la app → **Abrir** → Abrir
+3. O en Terminal: `xattr -cr "/Applications/KCC Nexo.app"`
+
+Con un Apple Developer ID se puede firmar + notarizar después
+(`CSC_LINK` / `APPLE_ID` en el entorno de build).
 
 ## Notas
 
