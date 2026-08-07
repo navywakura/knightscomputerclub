@@ -47,9 +47,12 @@ type FriendUser = {
   avatar_url: string | null;
 };
 
-type Props = { initialTab?: Tab | null };
+type Props = { initialTab?: Tab | null; initialOtpError?: string | null };
 
-export default function SettingsApp({ initialTab = "profile" }: Props) {
+export default function SettingsApp({
+  initialTab = "profile",
+  initialOtpError = null,
+}: Props) {
   const [tab, setTab] = useState<Tab>(
     initialTab === "friends" ||
       initialTab === "privacy" ||
@@ -60,7 +63,9 @@ export default function SettingsApp({ initialTab = "profile" }: Props) {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    initialOtpError ? String(initialOtpError).slice(0, 280) : ""
+  );
   const [ok, setOk] = useState("");
 
   // profile form

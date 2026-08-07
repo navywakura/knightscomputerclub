@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 type Props = {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; otp_err?: string }>;
 };
 
 export default async function SettingsPage({ searchParams }: Props) {
@@ -20,9 +20,10 @@ export default async function SettingsPage({ searchParams }: Props) {
     tab === "friends" || tab === "privacy" || tab === "account" || tab === "profile"
       ? tab
       : "profile";
+  const otpErr = sp.otp_err ? String(sp.otp_err).slice(0, 280) : null;
   return (
     <main className="page settings-page">
-      <SettingsApp initialTab={initial} />
+      <SettingsApp initialTab={initial} initialOtpError={otpErr} />
     </main>
   );
 }

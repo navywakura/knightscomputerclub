@@ -71,6 +71,7 @@ export async function POST(req: Request) {
     await setSessionCookie(token);
 
     // OTP de verificación (owner ya verified)
+    let otpError: string | undefined;
     if (!isOwner) {
       const otp = await issueEmailOtp(db, {
         id: user.id,
@@ -78,6 +79,7 @@ export async function POST(req: Request) {
         username,
       });
       if (!otp.ok) {
+        otpError = otp.error;
         console.warn("[register] OTP no enviado:", otp.error);
       }
     }
@@ -86,9 +88,13 @@ export async function POST(req: Request) {
       {
         user,
         needs_verification: !user.email_verified,
+        otp_sent: !isOwner && !otpError,
+        otp_error: otpError,
         message: user.email_verified
           ? undefined
-          : "revisá tu email y verificá con el código OTP en /settings",
+          : otpError
+            ? `cuenta creada, pero el OTP no salió: ${otpError}. Reintentá desde settings → privacidad.`
+            : "revisá tu email y verificá con el código OTP en /settings → privacidad",
       },
       { status: 201 }
     );

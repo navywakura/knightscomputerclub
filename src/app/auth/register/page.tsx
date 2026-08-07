@@ -31,8 +31,18 @@ function RegisterForm() {
         setError(data.error || "error de registro");
         return;
       }
-      let dest = "/forum";
-      if (nextRaw) {
+      // si el OTP falló, mandamos a settings/privacidad con el error visible
+      if (data.needs_verification && data.otp_error) {
+        router.push(
+          `/settings?tab=privacy&otp_err=${encodeURIComponent(
+            String(data.otp_error).slice(0, 200)
+          )}`
+        );
+        router.refresh();
+        return;
+      }
+      let dest = data.needs_verification ? "/settings?tab=privacy" : "/forum";
+      if (nextRaw && !data.needs_verification) {
         const { safeInternalPath } = await import("@/lib/auth-redirect");
         dest = safeInternalPath(nextRaw, "/forum");
       }
@@ -49,8 +59,8 @@ function RegisterForm() {
     <Panel title="~/auth · register">
       <h1>NUEVO HANDLE</h1>
       <p className="muted">
-        username 3–32 · a-z 0-9 _ - · password ≥ 8 · sin verificación de
-        email (aún)
+        username 3–32 · a-z 0-9 _ - · password ≥ 8 · te mandamos un OTP al
+        email para verificar
       </p>
       <div style={{ maxWidth: 420, marginBottom: 16 }}>
         <p className="muted" style={{ marginBottom: 8 }}>
