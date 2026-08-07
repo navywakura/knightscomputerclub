@@ -1,5 +1,22 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Panel from "@/components/Panel";
+
+export const metadata: Metadata = {
+  title: {
+    absolute: "knightscomputer.club — nodo tecnoactivista",
+  },
+  description:
+    "Lobby del nodo: computación libre, RXos, foro y donaciones. Tecnoactivismo sin vigilancia.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "knightscomputer.club — lobby",
+    description:
+      "Nodo underground: doná, debaté y desarrollá RXos. Bienvenido al lobby.",
+    url: "/",
+    type: "website",
+  },
+};
 
 const ASCII = `
  ██╗  ██╗ ██████╗

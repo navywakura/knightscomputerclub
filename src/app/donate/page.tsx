@@ -1,11 +1,36 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Panel from "@/components/Panel";
 import CopyButton from "@/components/CopyButton";
 import { getDonationChannels } from "@/lib/donations";
 
-export const metadata = {
-  title: "donar — knightscomputer.club",
-  description: "Canales de donación: PayPal, Ko-fi, Bitcoin, Solana, USDT",
+export const metadata: Metadata = {
+  title: "donar",
+  description:
+    "Apoyá el nodo y RXos: PayPal, Ko-fi, Bitcoin, Solana y USDT. Donantes verificados reciben rango VIP en el foro.",
+  alternates: { canonical: "/donate" },
+  openGraph: {
+    title: "Donar · knightscomputer.club",
+    description:
+      "Canales de donación fiat y crypto para el nodo y el desarrollo de RXos.",
+    url: "/donate",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Donar · knightscomputer.club",
+    description: "PayPal, Ko-fi, BTC, SOL, USDT — financiá el nodo.",
+  },
+  keywords: [
+    "donar",
+    "bitcoin",
+    "solana",
+    "usdt",
+    "paypal",
+    "ko-fi",
+    "RXos",
+    "knightscomputer",
+  ],
 };
 
 export default function DonatePage() {

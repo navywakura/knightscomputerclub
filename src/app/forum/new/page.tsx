@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import ForumApp from "@/components/forum/ForumApp";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "nuevo hilo — foro · knightscomputer.club",
+export const metadata: Metadata = {
+  title: "nuevo hilo",
+  robots: { index: false, follow: false },
+  alternates: { canonical: "/forum/new" },
 };
 
 type Props = { searchParams: Promise<{ cat?: string }> };
