@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -6,6 +7,10 @@ import ShareButton from "@/components/ShareButton";
 import { ensureSchema, getDb } from "@/lib/db";
 import { parseConnections } from "@/lib/auth";
 import { getRank, rankNameClass } from "@/lib/ranks";
+import {
+  getProfileTheme,
+  profileThemeStyle,
+} from "@/lib/profile-themes";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +25,7 @@ async function loadUser(username: string) {
       SELECT
         id, username, role, is_vip, created_at,
         display_name, avatar_media_id, banner_media_id, bio, connections,
-        pgp_fingerprint, pgp_public_key
+        profile_theme, pgp_fingerprint, pgp_public_key
       FROM users
       WHERE lower(username) = ${uname}
         AND banned IS NOT TRUE
@@ -95,7 +100,7 @@ export default async function PublicProfilePage({ params }: Props) {
   const avatar = u.avatar_media_id
     ? `/api/media/${u.avatar_media_id}`
     : null;
-  const banner = u.banner_media_id
+  const userBanner = u.banner_media_id
     ? `/api/media/${u.banner_media_id}`
     : null;
   const display = u.display_name
@@ -104,12 +109,40 @@ export default async function PublicProfilePage({ params }: Props) {
   const conns = parseConnections(u.connections);
   const fp = u.pgp_fingerprint ? String(u.pgp_fingerprint) : null;
   const pub = u.pgp_public_key ? String(u.pgp_public_key) : null;
+  const theme = getProfileTheme(u.profile_theme);
+  const themeStyle = profileThemeStyle(theme);
+  const bannerUrl = userBanner || theme.banner;
 
   return (
-    <main className="page profile-public">
+    <main
+      className={`page profile-public profile-theme profile-theme-${theme.id}`}
+      style={themeStyle as CSSProperties}
+      data-theme={theme.id}
+    >
+      {/* fondo full-page del tema */}
+      <div className="profile-theme-bg" aria-hidden />
+
+      {/* decoraciones (fotos de internet) */}
+      {theme.decors[0] ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          className="profile-decor profile-decor-a"
+          src={theme.decors[0]}
+          alt=""
+        />
+      ) : null}
+      {theme.decors[1] ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          className="profile-decor profile-decor-b"
+          src={theme.decors[1]}
+          alt=""
+        />
+      ) : null}
+
       <div
         className="profile-public-banner"
-        style={banner ? { backgroundImage: `url(${banner})` } : undefined}
+        style={{ backgroundImage: `url(${bannerUrl})` }}
       />
       <div className="profile-public-card">
         <div className="profile-public-av">
@@ -137,9 +170,10 @@ export default async function PublicProfilePage({ params }: Props) {
             className="profile-share-btn"
           />
         </div>
-        <p className="muted">
+        <p className="profile-public-meta">
           @{String(u.username)} · miembro desde{" "}
           {new Date(String(u.created_at)).toLocaleDateString()}
+          <span className="profile-theme-badge"> · tema: {theme.name}</span>
         </p>
         {u.bio ? <p className="profile-public-bio">{String(u.bio)}</p> : null}
 
@@ -161,7 +195,9 @@ export default async function PublicProfilePage({ params }: Props) {
               </a>
             ) : null}
             {conns.discord ? (
-              <span className="muted">discord: {conns.discord}</span>
+              <span className="profile-public-meta">
+                discord: {conns.discord}
+              </span>
             ) : null}
           </div>
         ) : null}
@@ -170,7 +206,7 @@ export default async function PublicProfilePage({ params }: Props) {
           <section className="profile-public-pgp">
             <h2>PGP</h2>
             {fp ? (
-              <p className="muted" style={{ fontSize: "0.85rem" }}>
+              <p className="profile-public-meta" style={{ fontSize: "0.85rem" }}>
                 fingerprint: <code>{fp}</code>
               </p>
             ) : null}
@@ -180,7 +216,10 @@ export default async function PublicProfilePage({ params }: Props) {
           </section>
         ) : null}
 
-        <div className="compose-toolbar profile-public-actions" style={{ marginTop: 16 }}>
+        <div
+          className="compose-toolbar profile-public-actions"
+          style={{ marginTop: 16 }}
+        >
           <ShareButton
             path={`/u/${encodeURIComponent(String(u.username))}`}
             title={`@${String(u.username)} · knightscomputer.club`}
@@ -192,7 +231,10 @@ export default async function PublicProfilePage({ params }: Props) {
             label="[ compartir ]"
             className="btn secondary"
           />
-          <Link href={`/nexo?dm_user=${encodeURIComponent(String(u.username))}`} className="btn">
+          <Link
+            href={`/nexo?dm_user=${encodeURIComponent(String(u.username))}`}
+            className="btn"
+          >
             [ DM en nexo ]
           </Link>
           <Link href="/forum" className="btn secondary">

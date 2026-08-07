@@ -10,6 +10,12 @@ import {
   canUseDesktopNotify,
 } from "@/lib/browser-notify";
 import { isUiSfxEnabled, setUiSfxEnabled, playUiSfx } from "@/lib/ui-sfx";
+import {
+  DEFAULT_PROFILE_THEME,
+  PROFILE_THEMES,
+  type ProfileThemeId,
+  isProfileThemeId,
+} from "@/lib/profile-themes";
 
 type Tab = "profile" | "friends" | "privacy" | "account";
 
@@ -35,6 +41,7 @@ type Me = {
   email_verified?: boolean;
   email?: string;
   pending_deletion?: boolean;
+  profile_theme?: string;
 };
 
 type FriendUser = {
@@ -72,6 +79,9 @@ export default function SettingsApp({
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
+  const [profileTheme, setProfileTheme] = useState<ProfileThemeId>(
+    DEFAULT_PROFILE_THEME
+  );
   const [dmPrivacy, setDmPrivacy] = useState<"everyone" | "friends">("everyone");
   const [conn, setConn] = useState<Conn>({});
   const [avatarId, setAvatarId] = useState<number | null>(null);
@@ -111,6 +121,11 @@ export default function SettingsApp({
     setDisplayName(u.display_name || "");
     setUsername(u.username || "");
     setBio(u.bio || "");
+    setProfileTheme(
+      isProfileThemeId(u.profile_theme)
+        ? u.profile_theme
+        : DEFAULT_PROFILE_THEME
+    );
     setDmPrivacy(u.dm_privacy === "friends" ? "friends" : "everyone");
     setConn(u.connections || {});
     setAvatarPreview(u.avatar_url || null);
@@ -240,6 +255,7 @@ export default function SettingsApp({
         display_name: displayName,
         username,
         bio,
+        profile_theme: profileTheme,
         dm_privacy: dmPrivacy,
         connections: conn,
         pgp_public_key: pgpKey,
@@ -629,6 +645,42 @@ export default function SettingsApp({
           <p className="muted" style={{ fontSize: "0.75rem" }}>
             {bio.length}/100
           </p>
+
+          <h3 className="settings-sub">tema del perfil público</h3>
+          <p className="muted" style={{ fontSize: "0.85rem" }}>
+            Fondo, colores y decoración en{" "}
+            <Link href={`/u/${encodeURIComponent(me.username)}`}>
+              /u/{me.username}
+            </Link>
+            . No todos tienen que ser matrix-verde.
+          </p>
+          <div className="profile-theme-grid" role="listbox" aria-label="tema de perfil">
+            {PROFILE_THEMES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="option"
+                aria-selected={profileTheme === t.id}
+                className={`profile-theme-card${
+                  profileTheme === t.id ? " on" : ""
+                }`}
+                onClick={() => setProfileTheme(t.id)}
+                style={{
+                  borderColor:
+                    profileTheme === t.id ? t.vars.accent : undefined,
+                }}
+              >
+                <span
+                  className="profile-theme-thumb"
+                  style={{ backgroundImage: `url(${t.preview})` }}
+                />
+                <span className="profile-theme-meta">
+                  <strong style={{ color: t.vars.accent }}>{t.name}</strong>
+                  <span className="muted">{t.description}</span>
+                </span>
+              </button>
+            ))}
+          </div>
 
           <h3 className="settings-sub">conexiones</h3>
           <p className="muted" style={{ fontSize: "0.85rem" }}>

@@ -168,6 +168,17 @@ export const profilePatchSchema = z
     display_name: z.string().max(64).optional(),
     username: z.string().min(3).max(32).optional(),
     bio: z.string().max(100).optional(),
+    profile_theme: z
+      .enum([
+        "matrix",
+        "meadow",
+        "galaxy",
+        "flowers",
+        "anime",
+        "ocean",
+        "sunset",
+      ])
+      .optional(),
     dm_privacy: z.enum(["everyone", "friends"]).optional(),
     avatar_media_id: z
       .union([z.coerce.number().int().positive(), z.null(), z.literal("")])

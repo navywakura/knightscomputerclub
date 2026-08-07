@@ -110,6 +110,13 @@ export async function PATCH(req: Request) {
       `;
     }
 
+    if ("profile_theme" in body && body.profile_theme != null) {
+      const theme = String(body.profile_theme);
+      await db`
+        UPDATE users SET profile_theme = ${theme} WHERE id = ${user.id}
+      `;
+    }
+
     if ("dm_privacy" in body) {
       const p = String(body.dm_privacy || "everyone");
       if (p !== "everyone" && p !== "friends") {
@@ -254,7 +261,7 @@ export async function PATCH(req: Request) {
       SELECT
         id, username, email, password_hash, role, is_vip, banned, created_at,
         display_name, avatar_media_id, banner_media_id, dm_privacy, bio,
-        email_verified, deleted_at, connections,
+        profile_theme, email_verified, deleted_at, connections,
         pgp_public_key, pgp_fingerprint
       FROM users WHERE id = ${user.id} LIMIT 1
     `;

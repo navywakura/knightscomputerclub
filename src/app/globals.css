@@ -5134,44 +5134,116 @@ body.nexo-app-active footer {
   opacity: 0.5;
 }
 
-/* public profile */
+/* public profile + themes */
 .profile-public {
   max-width: 640px;
   margin: 0 auto;
   padding: 0 12px 40px;
+  position: relative;
+  z-index: 1;
 }
-.profile-public-banner {
-  height: 140px;
-  margin: 0 -12px 0;
-  background:
-    linear-gradient(180deg, transparent, rgba(0,0,0,0.5)),
-    color-mix(in srgb, var(--green) 10%, #050807);
+
+.profile-theme {
+  color: var(--pt-text, var(--text));
+  min-height: 70vh;
+}
+
+.profile-theme-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.55) 0%,
+      rgba(0, 0, 0, 0.72) 50%,
+      rgba(0, 0, 0, 0.88) 100%
+    ),
+    var(--pt-bg-image, none);
   background-size: cover;
   background-position: center;
-  border-bottom: 1px solid var(--border);
+  background-attachment: fixed;
 }
-.profile-public-card {
-  margin-top: -40px;
+
+.profile-decor {
+  position: fixed;
+  z-index: 0;
+  pointer-events: none;
+  object-fit: cover;
+  border-radius: 50%;
+  opacity: 0.55;
+  box-shadow: 0 0 40px var(--pt-glow, transparent);
+  border: 2px solid color-mix(in srgb, var(--pt-accent, #33ff66) 40%, transparent);
+}
+
+.profile-decor-a {
+  width: min(180px, 28vw);
+  height: min(180px, 28vw);
+  top: 12%;
+  left: 3%;
+  transform: rotate(-8deg);
+}
+
+.profile-decor-b {
+  width: min(140px, 22vw);
+  height: min(140px, 22vw);
+  bottom: 10%;
+  right: 4%;
+  transform: rotate(12deg);
+  opacity: 0.45;
+}
+
+.profile-public-banner {
+  height: 160px;
+  margin: 0 -12px 0;
+  background:
+    linear-gradient(180deg, transparent 20%, rgba(0, 0, 0, 0.65)),
+    color-mix(in srgb, var(--pt-accent, var(--green)) 12%, #050807);
+  background-size: cover;
+  background-position: center;
+  border-bottom: 1px solid var(--pt-card-border, var(--border));
+  border-radius: 0 0 4px 4px;
   position: relative;
+  z-index: 1;
 }
+
+.profile-public-card {
+  margin-top: -44px;
+  position: relative;
+  z-index: 2;
+  padding: 16px 18px 20px;
+  background: var(--pt-card-bg, rgba(10, 18, 10, 0.92));
+  border: 1px solid var(--pt-card-border, var(--border));
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 12px 40px rgba(0, 0, 0, 0.45),
+    0 0 28px var(--pt-glow, transparent);
+  backdrop-filter: blur(8px);
+}
+
 .profile-public-av {
   width: 88px;
   height: 88px;
   border-radius: 50%;
-  border: 2px solid var(--border);
+  border: 3px solid var(--pt-accent, var(--border));
   overflow: hidden;
   display: grid;
   place-items: center;
-  background: #0a100c;
+  background: var(--pt-btn-bg, #0a100c);
   font-size: 1.4rem;
   text-transform: uppercase;
-  color: var(--green);
+  color: var(--pt-accent, var(--green));
+  box-shadow: 0 0 16px var(--pt-glow, transparent);
 }
+
 .profile-public-av img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
+
 .profile-public-heading {
   display: flex;
   flex-wrap: wrap;
@@ -5186,15 +5258,27 @@ body.nexo-app-active footer {
   font-size: 1.35rem;
   flex: 1 1 auto;
   min-width: 0;
+  color: var(--pt-text, var(--text));
+}
+
+.profile-public-meta {
+  color: var(--pt-muted, var(--text-dim));
+  font-size: 0.9rem;
+}
+
+.profile-theme-badge {
+  color: var(--pt-accent, var(--green));
+  opacity: 0.85;
+  font-size: 0.8rem;
 }
 
 .profile-share-btn {
   font-family: var(--font-ui);
   font-size: 0.8rem;
   letter-spacing: 0.04em;
-  color: var(--green);
-  background: #061006;
-  border: 1px solid var(--border);
+  color: var(--pt-accent, var(--green));
+  background: var(--pt-btn-bg, #061006);
+  border: 1px solid var(--pt-btn-border, var(--border));
   padding: 6px 12px;
   cursor: pointer;
   min-height: 36px;
@@ -5202,9 +5286,9 @@ body.nexo-app-active footer {
 }
 
 .profile-share-btn:hover {
-  border-color: var(--green);
+  border-color: var(--pt-accent, var(--green));
   color: #fff;
-  text-shadow: 0 0 8px var(--green-glow);
+  box-shadow: 0 0 12px var(--pt-glow, transparent);
 }
 
 .profile-public-actions {
@@ -5215,31 +5299,122 @@ body.nexo-app-active footer {
 .profile-public-actions .btn,
 .profile-public-actions button.btn {
   min-height: 40px;
+  border-color: var(--pt-btn-border, var(--border));
+  color: var(--pt-text, var(--text));
+  background: var(--pt-btn-bg, transparent);
 }
+
+.profile-public-actions .btn:hover,
+.profile-public-actions button.btn:hover {
+  border-color: var(--pt-accent, var(--green));
+  color: var(--pt-accent, var(--green));
+}
+
 .profile-public-bio {
   margin: 10px 0;
   white-space: pre-wrap;
+  color: var(--pt-text, var(--text));
 }
+
 .profile-public-links {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   margin: 12px 0;
 }
+
+.profile-public-links a {
+  color: var(--pt-link, var(--green));
+  border-bottom-color: var(--pt-accent, var(--green-dim));
+}
+
 .profile-public-pgp h2 {
   font-size: 0.95rem;
-  color: var(--amber);
+  color: var(--pt-accent, var(--amber));
   margin: 18px 0 6px;
 }
+
 .profile-pgp-block {
   font-size: 0.7rem;
   overflow: auto;
   max-height: 200px;
   padding: 10px;
-  border: 1px solid var(--border);
-  background: #050807;
+  border: 1px solid var(--pt-card-border, var(--border));
+  background: color-mix(in srgb, var(--pt-btn-bg, #050807) 90%, black);
   white-space: pre-wrap;
   word-break: break-all;
+  color: var(--pt-muted, var(--text-dim));
+}
+
+/* settings: theme picker */
+.profile-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 10px 0 18px;
+}
+
+.profile-theme-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #050a06;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  border-radius: 4px;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.profile-theme-card:hover {
+  border-color: var(--green-dim);
+}
+
+.profile-theme-card.on {
+  box-shadow: 0 0 0 1px var(--green), 0 0 14px rgba(0, 255, 65, 0.2);
+}
+
+.profile-theme-thumb {
+  display: block;
+  height: 72px;
+  background-size: cover;
+  background-position: center;
+  border-bottom: 1px solid #14301a;
+}
+
+.profile-theme-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px 10px;
+  font-size: 0.78rem;
+}
+
+.profile-theme-meta strong {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .profile-decor-a {
+    width: 100px;
+    height: 100px;
+    top: 8%;
+    opacity: 0.35;
+  }
+  .profile-decor-b {
+    width: 80px;
+    height: 80px;
+    opacity: 0.3;
+  }
+  .profile-theme-bg {
+    background-attachment: scroll;
+  }
 }
 
 /* forum post avatars */

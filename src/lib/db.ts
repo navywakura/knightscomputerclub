@@ -222,6 +222,11 @@ export async function ensureSchema() {
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS connections JSONB NOT NULL DEFAULT '{}'::jsonb
   `;
+  // Tema visual del perfil público
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS profile_theme VARCHAR(32) NOT NULL DEFAULT 'matrix'
+  `;
   // Verificación email + soft delete (7 días)
   await db`
     ALTER TABLE users
@@ -836,6 +841,7 @@ export type UserRow = {
   banner_media_id?: number | null;
   dm_privacy?: string | null;
   bio?: string | null;
+  profile_theme?: string | null;
   email_verified?: boolean;
   deleted_at?: string | null;
   connections?: UserConnections | string | null;
@@ -853,6 +859,7 @@ export type PublicUser = {
   banner_url: string | null;
   dm_privacy: "everyone" | "friends";
   bio: string;
+  profile_theme: string;
   connections: UserConnections;
   email_verified: boolean;
   email?: string;
