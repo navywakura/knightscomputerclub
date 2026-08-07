@@ -70,9 +70,10 @@ export async function GET(req: Request) {
     if (user && postIds.length) {
       try {
         const mine = await db`
-          SELECT post_id FROM post_likes
-          WHERE user_id = ${user.id}
-            AND post_id = ANY(${postIds})
+          SELECT pl.post_id
+          FROM post_likes pl
+          JOIN unnest(${postIds}::int[]) AS pid(id) ON pl.post_id = pid.id
+          WHERE pl.user_id = ${user.id}
         `;
         for (const r of mine) likedSet.add(Number(r.post_id));
       } catch {

@@ -27,11 +27,12 @@ export async function GET(req: Request) {
     // cap
     const limited = ids.slice(0, 200);
 
+    // Neon serverless: prefer unnest(array) over ANY with raw JS arrays
     const counts = await db`
-      SELECT post_id, COUNT(*)::int AS n
-      FROM post_likes
-      WHERE post_id = ANY(${limited})
-      GROUP BY post_id
+      SELECT pl.post_id, COUNT(*)::int AS n
+      FROM post_likes pl
+      JOIN unnest(${limited}::int[]) AS pid(id) ON pl.post_id = pid.id
+      GROUP BY pl.post_id
     `;
     const countMap = new Map<number, number>();
     for (const r of counts) {
@@ -41,9 +42,10 @@ export async function GET(req: Request) {
     const likedSet = new Set<number>();
     if (me) {
       const mine = await db`
-        SELECT post_id FROM post_likes
-        WHERE user_id = ${me.id}
-          AND post_id = ANY(${limited})
+        SELECT pl.post_id
+        FROM post_likes pl
+        JOIN unnest(${limited}::int[]) AS pid(id) ON pl.post_id = pid.id
+        WHERE pl.user_id = ${me.id}
       `;
       for (const r of mine) likedSet.add(Number(r.post_id));
     }
