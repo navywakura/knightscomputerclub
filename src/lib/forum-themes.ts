@@ -81,8 +81,8 @@ export const VIP_PERKS: Array<{ title: string; body: string }> = [
     body: "Handle en oro eléctrico y etiqueta visible en posts y lista online.",
   },
   {
-    title: "Temas del foro (exclusivo)",
-    body: "Cambiá wallpaper + acentos del /forum: Matrix (verde), Serial Silver (plata) o Neon Street (rojo).",
+    title: "Temas del foro y nexo (exclusivo)",
+    body: "Misma skin en /forum y /nexo: Matrix (verde), Serial Silver (plata) o Neon Street (rojo). Se guarda en el navegador.",
   },
   {
     title: "Crear tablones en // nexo",

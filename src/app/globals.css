@@ -3044,10 +3044,13 @@ button.linkish:hover {
   line-height: 1.25;
 }
 
-/* --- apply themes on body while forum is open --- */
+/* --- VIP skins: foro + nexo (body.forum-app-active | body.nexo-app-active) --- */
 body.forum-app-active[data-forum-theme="matrix"],
 body.forum-app-active[data-forum-theme="serial"],
-body.forum-app-active[data-forum-theme="neon"] {
+body.forum-app-active[data-forum-theme="neon"],
+body.nexo-app-active[data-forum-theme="matrix"],
+body.nexo-app-active[data-forum-theme="serial"],
+body.nexo-app-active[data-forum-theme="neon"] {
   background-color: #020403;
   background-size: cover;
   background-position: center center;
@@ -3055,7 +3058,8 @@ body.forum-app-active[data-forum-theme="neon"] {
   background-attachment: fixed;
 }
 
-body.forum-app-active[data-forum-theme="matrix"] {
+body.forum-app-active[data-forum-theme="matrix"],
+body.nexo-app-active[data-forum-theme="matrix"] {
   --green: #33ff66;
   --green-dim: #1a9940;
   --green-glow: #00ff41;
@@ -3075,7 +3079,8 @@ body.forum-app-active[data-forum-theme="matrix"] {
     url("/forum-themes/matrix-green.jpg");
 }
 
-body.forum-app-active[data-forum-theme="serial"] {
+body.forum-app-active[data-forum-theme="serial"],
+body.nexo-app-active[data-forum-theme="serial"] {
   --green: #c8d0d8;
   --green-dim: #7a8490;
   --green-glow: #e8eef4;
@@ -3096,7 +3101,8 @@ body.forum-app-active[data-forum-theme="serial"] {
     url("/forum-themes/serial-silver.jpg");
 }
 
-body.forum-app-active[data-forum-theme="neon"] {
+body.forum-app-active[data-forum-theme="neon"],
+body.nexo-app-active[data-forum-theme="neon"] {
   --green: #ff4466;
   --green-dim: #992233;
   --green-glow: #ff6688;
@@ -3120,29 +3126,48 @@ body.forum-app-active[data-forum-theme="neon"] {
 
 body.forum-app-active[data-forum-theme="matrix"] .forum-app,
 body.forum-app-active[data-forum-theme="serial"] .forum-app,
-body.forum-app-active[data-forum-theme="neon"] .forum-app {
+body.forum-app-active[data-forum-theme="neon"] .forum-app,
+body.nexo-app-active[data-forum-theme="matrix"] .nexo-app,
+body.nexo-app-active[data-forum-theme="serial"] .nexo-app,
+body.nexo-app-active[data-forum-theme="neon"] .nexo-app {
   background: rgba(2, 6, 4, 0.55);
   backdrop-filter: blur(2px);
 }
 
-body.forum-app-active[data-forum-theme="serial"] .forum-app {
+body.forum-app-active[data-forum-theme="serial"] .forum-app,
+body.nexo-app-active[data-forum-theme="serial"] .nexo-app {
   background: rgba(10, 12, 14, 0.62);
 }
 
-body.forum-app-active[data-forum-theme="neon"] .forum-app {
+body.forum-app-active[data-forum-theme="neon"] .forum-app,
+body.nexo-app-active[data-forum-theme="neon"] .nexo-app {
   background: rgba(12, 4, 8, 0.58);
 }
 
 body.forum-app-active[data-forum-theme="matrix"] .forum-pane-head,
 body.forum-app-active[data-forum-theme="serial"] .forum-pane-head,
-body.forum-app-active[data-forum-theme="neon"] .forum-pane-head {
+body.forum-app-active[data-forum-theme="neon"] .forum-pane-head,
+body.nexo-app-active[data-forum-theme="matrix"] .forum-pane-head,
+body.nexo-app-active[data-forum-theme="serial"] .forum-pane-head,
+body.nexo-app-active[data-forum-theme="neon"] .forum-pane-head,
+body.nexo-app-active[data-forum-theme="matrix"] .nexo-top,
+body.nexo-app-active[data-forum-theme="serial"] .nexo-top,
+body.nexo-app-active[data-forum-theme="neon"] .nexo-top {
   background: rgba(0, 0, 0, 0.45);
 }
 
 body.forum-app-active[data-forum-theme="matrix"] .forum-pane-body,
 body.forum-app-active[data-forum-theme="serial"] .forum-pane-body,
-body.forum-app-active[data-forum-theme="neon"] .forum-pane-body {
+body.forum-app-active[data-forum-theme="neon"] .forum-pane-body,
+body.nexo-app-active[data-forum-theme="matrix"] .forum-pane-body,
+body.nexo-app-active[data-forum-theme="serial"] .forum-pane-body,
+body.nexo-app-active[data-forum-theme="neon"] .forum-pane-body {
   background: rgba(0, 0, 0, 0.28);
+}
+
+.nexo-loading.forum-app-booting {
+  background: #020403;
+  border-color: #1a5a2a;
 }
 
 /* donate VIP perks */
@@ -3530,4 +3555,19 @@ body.nexo-app-active footer {
     border-right: none;
     border-bottom: 1px solid #14301a;
   }
+}
+
+.nexo-lock-icon {
+  width: 0.85em;
+  height: 0.85em;
+  vertical-align: -0.1em;
+  opacity: 0.85;
+}
+
+.form-ok.nexo-error {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 40, 12, 0.35);
+  color: var(--green);
+  font-size: 0.85rem;
 }

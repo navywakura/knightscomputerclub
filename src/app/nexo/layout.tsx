@@ -1,15 +1,8 @@
-import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/auth";
-
-/** /nexo requiere sesión (igual que /forum). */
-export default async function NexoLayout({
+/** Layout de nexo: el auth + next de invitación se resuelve en page.tsx */
+export default function NexoLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getSessionUser().catch(() => null);
-  if (!user || user.banned) {
-    redirect("/");
-  }
   return children;
 }

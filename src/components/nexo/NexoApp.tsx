@@ -8,10 +8,15 @@ import {
   useRef,
   useState,
 } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLock } from "@fortawesome/free-solid-svg-icons";
 import AppContextMenu, {
   type ContextMenuItem,
 } from "@/components/ui/AppContextMenu";
 import RankBadge from "@/components/RankBadge";
+import VipThemePicker from "@/components/VipThemePicker";
+import WiredBootScreen, { WIRED_BOOT_MIN_MS } from "@/components/WiredBootScreen";
+import { nexoInviteUrl } from "@/lib/auth-redirect";
 import { canCreateNexoBoard, dmUnlockKey, NEXO_POLL_MS } from "@/lib/nexo";
 import { apiFetch, getStorage } from "@/lib/platform";
 import { getRank, rankNameClass } from "@/lib/ranks";
@@ -52,7 +57,17 @@ type DmThread = {
 
 type Tab = "boards" | "dm";
 
-export default function NexoApp() {
+type Props = {
+  /** slug de invitación (?join=) */
+  initialJoinSlug?: string | null;
+  /** abrir DM por notificación (?dm=threadId) */
+  initialDmId?: number | null;
+};
+
+export default function NexoApp({
+  initialJoinSlug = null,
+  initialDmId = null,
+}: Props) {
   const [me, setMe] = useState<Me | null>(null);
   const [tab, setTab] = useState<Tab>("boards");
   const [boards, setBoards] = useState<Board[]>([]);
@@ -79,6 +94,13 @@ export default function NexoApp() {
   const [dmOpenUser, setDmOpenUser] = useState("");
   const [dmOpenPin, setDmOpenPin] = useState("");
   const [showDmOpen, setShowDmOpen] = useState(false);
+
+  // invitación a tablón
+  const [inviteBoard, setInviteBoard] = useState<Board | null>(null);
+  const [invitePrompt, setInvitePrompt] = useState(false);
+  const [inviteMissing, setInviteMissing] = useState(false);
+  const [copyOk, setCopyOk] = useState("");
+  const inviteHandled = useRef(false);
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const lastIdRef = useRef(0);
@@ -210,13 +232,88 @@ export default function NexoApp() {
   }, []);
 
   useEffect(() => {
+    const started =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    let cancelled = false;
     (async () => {
       setLoading(true);
       await loadMe();
       await loadBoards();
-      setLoading(false);
+      const elapsed =
+        (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+        started;
+      const wait = Math.max(0, WIRED_BOOT_MIN_MS - elapsed);
+      await new Promise((r) => setTimeout(r, wait));
+      if (!cancelled) setLoading(false);
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [loadMe, loadBoards]);
+
+  // invitación ?join=slug → prompt Unirse
+  useEffect(() => {
+    if (loading || inviteHandled.current || !initialJoinSlug) return;
+    inviteHandled.current = true;
+    const slug = initialJoinSlug.toLowerCase();
+    const found =
+      boards.find((b) => b.slug.toLowerCase() === slug) || null;
+    if (found) {
+      setInviteBoard(found);
+      setInvitePrompt(true);
+      setTab("boards");
+    } else {
+      setInviteMissing(true);
+      setError(`invitación: no se encontró el tablón “${initialJoinSlug}”`);
+    }
+    // limpiar query de la barra sin recargar
+    if (typeof window !== "undefined") {
+      const u = new URL(window.location.href);
+      if (u.searchParams.has("join")) {
+        u.searchParams.delete("join");
+        window.history.replaceState(null, "", u.pathname + u.search);
+      }
+    }
+  }, [loading, initialJoinSlug, boards]);
+
+  // notificación DM → ?dm=threadId
+  useEffect(() => {
+    if (loading || !initialDmId) return;
+    setTab("dm");
+    selectDm(initialDmId);
+    if (typeof window !== "undefined") {
+      const u = new URL(window.location.href);
+      if (u.searchParams.has("dm")) {
+        u.searchParams.delete("dm");
+        window.history.replaceState(null, "", u.pathname + u.search);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, initialDmId]);
+
+  function acceptInvite() {
+    if (inviteBoard) {
+      selectBoard(inviteBoard.id);
+    }
+    setInvitePrompt(false);
+    setInviteBoard(null);
+  }
+
+  function rejectInvite() {
+    setInvitePrompt(false);
+    setInviteBoard(null);
+  }
+
+  async function copyInviteLink(board: Board) {
+    const url = nexoInviteUrl(board.slug);
+    try {
+      await navigator.clipboard?.writeText(url);
+      setCopyOk(`enlace copiado: ${board.name}`);
+      window.setTimeout(() => setCopyOk(""), 2500);
+    } catch {
+      setError(`copiá manualmente: ${url}`);
+    }
+  }
 
   // poll board messages
   useEffect(() => {
@@ -425,9 +522,14 @@ export default function NexoApp() {
   const activeBoard = boards.find((b) => b.id === boardId) || null;
   const chatMsgs = tab === "boards" ? messages : dmMessages;
 
-  const boardCtx: ContextMenuItem[] = [
+  const boardCtxFor = (b: Board | null): ContextMenuItem[] => [
     { id: "open", label: "abrir chat" },
     { id: "copy", label: "copiar nombre" },
+    {
+      id: "invite",
+      label: "copiar enlace de invitación",
+      disabled: !b,
+    },
     { id: "sep1", label: "", separator: true },
     {
       id: "create",
@@ -443,8 +545,12 @@ export default function NexoApp() {
 
   if (loading) {
     return (
-      <div className="nexo-app nexo-loading">
-        <p className="muted">conectando a // nexo…</p>
+      <div className="nexo-app nexo-loading forum-app-booting">
+        <WiredBootScreen
+          text="Accediendo a la Wired..."
+          label="SERIAL EXPERIMENTS · // NEXO"
+          sub="PRESENT DAY · PRESENT TIME"
+        />
       </div>
     );
   }
@@ -476,6 +582,7 @@ export default function NexoApp() {
           </button>
         </div>
         <div className="nexo-actions">
+          <VipThemePicker user={me} />
           {tab === "boards" && (
             <button
               type="button"
@@ -518,6 +625,11 @@ export default function NexoApp() {
         </div>
       </header>
 
+      {copyOk && (
+        <div className="form-ok nexo-error" style={{ margin: 0 }}>
+          {copyOk}
+        </div>
+      )}
       {error && (
         <div className="form-error nexo-error">
           {error}{" "}
@@ -536,7 +648,7 @@ export default function NexoApp() {
           <div className="forum-pane-body">
             {tab === "boards" ? (
               <AppContextMenu
-                items={boardCtx}
+                items={boardCtxFor(null)}
                 onSelect={(id) => {
                   if (id === "create") {
                     if (vip) setShowCreate(true);
@@ -559,12 +671,13 @@ export default function NexoApp() {
                     boards.map((b) => (
                       <li key={b.id}>
                         <AppContextMenu
-                          items={boardCtx}
+                          items={boardCtxFor(b)}
                           onSelect={(id) => {
                             if (id === "open") selectBoard(b.id);
                             if (id === "copy") {
                               void navigator.clipboard?.writeText(b.name);
                             }
+                            if (id === "invite") void copyInviteLink(b);
                             if (id === "create" && vip) setShowCreate(true);
                           }}
                         >
@@ -606,8 +719,12 @@ export default function NexoApp() {
                           @{t.peer?.username || "?"}
                         </span>
                         <span className="muted nexo-list-meta">
-                          🔒 PIN ·{" "}
-                          {new Date(t.updated_at).toLocaleString()}
+                          <FontAwesomeIcon
+                            icon={faLock}
+                            className="nexo-lock-icon"
+                            aria-hidden
+                          />{" "}
+                          PIN · {new Date(t.updated_at).toLocaleString()}
                         </span>
                       </button>
                     </li>
@@ -636,7 +753,10 @@ export default function NexoApp() {
                 {dmUnlocked ? (
                   <span className="tag ok">unlocked</span>
                 ) : (
-                  <span className="tag">locked</span>
+                  <span className="tag">
+                    <FontAwesomeIcon icon={faLock} className="nexo-lock-icon" />{" "}
+                    locked
+                  </span>
                 )}
               </span>
             ) : (
@@ -760,6 +880,41 @@ export default function NexoApp() {
           )}
         </section>
       </div>
+
+      {/* invitación a tablón */}
+      {invitePrompt && inviteBoard && (
+        <div className="nexo-modal-backdrop" role="presentation">
+          <div
+            className="nexo-modal"
+            role="dialog"
+            aria-label="unirse a tablón"
+          >
+            <h2>invitación</h2>
+            <p>
+              ¿Unirse a la conversación de{" "}
+              <strong>{inviteBoard.name}</strong>?
+            </p>
+            <p className="muted" style={{ fontSize: "0.85rem" }}>
+              @{inviteBoard.owner_name}
+              {inviteBoard.description
+                ? ` · ${inviteBoard.description}`
+                : ""}
+            </p>
+            <div className="compose-toolbar">
+              <button type="button" className="btn" onClick={acceptInvite}>
+                [ Entrar ]
+              </button>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={rejectInvite}
+              >
+                [ Rechazar ]
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* modal crear board — VIP only */}
       {showCreate && (

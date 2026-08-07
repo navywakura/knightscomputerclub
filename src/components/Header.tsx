@@ -83,7 +83,7 @@ export default function Header() {
                 <NotificationCenter
                   enabled
                   apiBase="/api/notifications"
-                  pollMs={40000}
+                  pollMs={15000}
                   onNavigate={(href) => {
                     router.push(href);
                     router.refresh();

@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
 import Panel from "@/components/Panel";
 import OAuthButtons from "@/components/OAuthButtons";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const search = useSearchParams();
+  const nextRaw = search.get("next");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,7 +31,12 @@ export default function RegisterPage() {
         setError(data.error || "error de registro");
         return;
       }
-      router.push("/forum");
+      let dest = "/forum";
+      if (nextRaw) {
+        const { safeInternalPath } = await import("@/lib/auth-redirect");
+        dest = safeInternalPath(nextRaw, "/forum");
+      }
+      router.push(dest);
       router.refresh();
     } catch {
       setError("red caída — reintentá");
@@ -90,8 +97,31 @@ export default function RegisterPage() {
         </button>
       </form>
       <p style={{ marginTop: 16 }} className="muted">
-        ¿ya tenés cuenta? <Link href="/auth/login">login</Link>
+        ¿ya tenés cuenta?{" "}
+        <Link
+          href={
+            nextRaw
+              ? `/auth/login?next=${encodeURIComponent(nextRaw)}`
+              : "/auth/login"
+          }
+        >
+          login
+        </Link>
       </p>
     </Panel>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <Panel title="~/auth · register">
+          <p className="muted">cargando…</p>
+        </Panel>
+      }
+    >
+      <RegisterForm />
+    </Suspense>
   );
 }

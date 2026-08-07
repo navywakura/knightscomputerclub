@@ -10,6 +10,7 @@ function LoginForm() {
   const router = useRouter();
   const search = useSearchParams();
   const oauthError = search.get("error");
+  const nextRaw = search.get("next");
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -30,7 +31,13 @@ function LoginForm() {
         setError(data.error || "error de login");
         return;
       }
-      router.push("/forum");
+      // invitación nexo u otro destino seguro
+      let dest = "/forum";
+      if (nextRaw) {
+        const { safeInternalPath } = await import("@/lib/auth-redirect");
+        dest = safeInternalPath(nextRaw, "/forum");
+      }
+      router.push(dest);
       router.refresh();
     } catch {
       setError("red caída — reintentá");
@@ -82,7 +89,15 @@ function LoginForm() {
       </form>
       <p style={{ marginTop: 16 }} className="muted">
         ¿sin cuenta?{" "}
-        <Link href="/auth/register">registrate en el nodo</Link>
+        <Link
+          href={
+            nextRaw
+              ? `/auth/register?next=${encodeURIComponent(nextRaw)}`
+              : "/auth/register"
+          }
+        >
+          registrate en el nodo
+        </Link>
       </p>
     </Panel>
   );

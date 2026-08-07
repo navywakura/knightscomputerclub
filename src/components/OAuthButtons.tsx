@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 export default function OAuthButtons() {
+  const search = useSearchParams();
+  const next = search.get("next");
+  const nextQ = next ? `?next=${encodeURIComponent(next)}` : "";
+
   const [status, setStatus] = useState<{
     google: boolean;
     github: boolean;
@@ -33,7 +38,10 @@ export default function OAuthButtons() {
   return (
     <div className="oauth-row">
       {status.google ? (
-        <a className="btn secondary oauth-btn" href="/api/auth/oauth/google">
+        <a
+          className="btn secondary oauth-btn"
+          href={`/api/auth/oauth/google${nextQ}`}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/icons/google.png"
@@ -46,7 +54,10 @@ export default function OAuthButtons() {
         </a>
       ) : null}
       {status.github ? (
-        <a className="btn secondary oauth-btn" href="/api/auth/oauth/github">
+        <a
+          className="btn secondary oauth-btn"
+          href={`/api/auth/oauth/github${nextQ}`}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/icons/github.png"

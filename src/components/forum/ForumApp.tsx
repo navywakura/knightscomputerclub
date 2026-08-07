@@ -17,43 +17,8 @@ import ShareButton from "@/components/ShareButton";
 import { getRank, isOwnerUser, rankNameClass, rankPostClass, rankUserClass } from "@/lib/ranks";
 import { excerptBody } from "@/lib/markdown";
 import type { LinkPreview } from "@/lib/link-preview";
-import {
-  FORUM_THEMES,
-  readForumTheme,
-  writeForumTheme,
-  type ForumThemeId,
-} from "@/lib/forum-themes";
-
-const WIRED_BOOT_TEXT = "Accediendo a la Wired...";
-const WIRED_BOOT_MIN_MS = 1600;
-
-function WiredBootScreen() {
-  return (
-    <div className="wired-boot" role="status" aria-live="polite" aria-busy="true">
-      <div className="wired-boot-noise" aria-hidden />
-      <div className="wired-boot-scan" aria-hidden />
-      <div className="wired-boot-vignette" aria-hidden />
-      <div className="wired-boot-inner">
-        <p className="wired-boot-label muted">SERIAL EXPERIMENTS · NODE FORUM</p>
-        <p className="wired-snake" aria-label={WIRED_BOOT_TEXT}>
-          {WIRED_BOOT_TEXT.split("").map((ch, i) => (
-            <span
-              key={`${ch}-${i}`}
-              className="wired-snake-char"
-              style={{ animationDelay: `${i * 0.055}s` }}
-            >
-              {ch === " " ? "\u00A0" : ch}
-            </span>
-          ))}
-        </p>
-        <div className="wired-boot-bar" aria-hidden>
-          <div className="wired-boot-bar-fill" />
-        </div>
-        <p className="wired-boot-sub">PRESENT DAY · PRESENT TIME</p>
-      </div>
-    </div>
-  );
-}
+import VipThemePicker from "@/components/VipThemePicker";
+import WiredBootScreen, { WIRED_BOOT_MIN_MS } from "@/components/WiredBootScreen";
 
 export type ForumCategory = {
   id: number;
@@ -163,8 +128,6 @@ export default function ForumApp({
   const [me, setMe] = useState<Me | null>(null);
   const [online, setOnline] = useState<OnlineUser[]>([]);
   const [leftTab, setLeftTab] = useState<"boards" | "online">("boards");
-  const [forumTheme, setForumTheme] = useState<ForumThemeId>("default");
-  const [themeOpen, setThemeOpen] = useState(false);
 
   const [loadingCats, setLoadingCats] = useState(true);
   const [loadingThreads, setLoadingThreads] = useState(false);
@@ -191,30 +154,9 @@ export default function ForumApp({
     document.body.classList.add("forum-app-active");
     return () => {
       document.body.classList.remove("forum-app-active");
-      document.body.removeAttribute("data-forum-theme");
+      // no borrar data-forum-theme si se navega a nexo (misma skin)
     };
   }, []);
-
-  // tema VIP (localStorage)
-  useEffect(() => {
-    setForumTheme(readForumTheme());
-  }, []);
-
-  useEffect(() => {
-    document.body.setAttribute("data-forum-theme", forumTheme);
-  }, [forumTheme]);
-
-  const canTheme =
-    !!me &&
-    (Boolean(me.is_vip) ||
-      isOwnerUser({ role: me.role, username: me.username }));
-
-  function pickTheme(id: ForumThemeId) {
-    if (!canTheme && id !== "default") return;
-    setForumTheme(id);
-    writeForumTheme(id);
-    setThemeOpen(false);
-  }
 
   const loadCategories = useCallback(async () => {
     setLoadingCats(true);
@@ -590,19 +532,13 @@ export default function ForumApp({
   if (booting) {
     return (
       <div className="forum-app forum-app-booting">
-        <WiredBootScreen />
+        <WiredBootScreen label="SERIAL EXPERIMENTS · NODE FORUM" />
       </div>
     );
   }
 
-  const themeMeta =
-    FORUM_THEMES.find((t) => t.id === forumTheme) || FORUM_THEMES[0];
-
   return (
-    <div
-      className={`forum-app${showingThread ? " is-reading" : ""}`}
-      data-forum-theme={forumTheme}
-    >
+    <div className={`forum-app${showingThread ? " is-reading" : ""}`}>
       <div className="forum-app-top">
         <div className="forum-app-brand">
           <span className="glow">FORO</span>
@@ -628,63 +564,7 @@ export default function ForumApp({
           >
             online · {online.length}
           </button>
-          {canTheme ? (
-            <div className="forum-theme-wrap">
-              <button
-                type="button"
-                className={`forum-chip forum-theme-chip${themeOpen ? " on" : ""}`}
-                onClick={() => setThemeOpen((x) => !x)}
-                title="tema VIP del foro"
-              >
-                theme · {themeMeta.label}
-              </button>
-              {themeOpen ? (
-                <div className="forum-theme-panel" role="dialog" aria-label="temas VIP">
-                  <p className="forum-theme-panel-title">
-                    <span className="vip-badge" data-text="[VIP]">
-                      [VIP]
-                    </span>{" "}
-                    skins del foro
-                  </p>
-                  <div className="forum-theme-grid">
-                    {FORUM_THEMES.map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        className={`forum-theme-card${
-                          forumTheme === t.id ? " on" : ""
-                        } theme-${t.id}`}
-                        onClick={() => pickTheme(t.id)}
-                      >
-                        <span
-                          className="forum-theme-thumb"
-                          style={
-                            t.thumb
-                              ? {
-                                  backgroundImage: `url(${t.thumb})`,
-                                }
-                              : undefined
-                          }
-                        />
-                        <span className="forum-theme-name">{t.label}</span>
-                        <span className="forum-theme-desc muted">
-                          {t.accent} · {t.description}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          ) : me ? (
-            <Link
-              href="/donate"
-              className="forum-chip"
-              title="temas del foro = perk VIP"
-            >
-              theme · VIP
-            </Link>
-          ) : null}
+          <VipThemePicker user={me} />
           <button
             type="button"
             className="btn"

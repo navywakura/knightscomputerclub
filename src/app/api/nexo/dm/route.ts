@@ -8,6 +8,7 @@ import {
   orderedUserPair,
   verifyPin,
 } from "@/lib/nexo";
+import { safeNotify } from "@/lib/notify";
 
 /** Lista DMs del usuario + abrir/crear con PIN */
 export async function GET(req: Request) {
@@ -223,7 +224,8 @@ export async function POST(req: Request) {
       }
 
       const thr = await db`
-        SELECT id, pin_hash FROM nexo_dm_threads
+        SELECT id, pin_hash, user_low, user_high
+        FROM nexo_dm_threads
         WHERE id = ${threadId}
           AND (user_low = ${user.id} OR user_high = ${user.id})
         LIMIT 1
@@ -244,6 +246,24 @@ export async function POST(req: Request) {
       await db`
         UPDATE nexo_dm_threads SET updated_at = NOW() WHERE id = ${threadId}
       `;
+
+      // notificar al otro participante
+      const peerId =
+        Number(thr[0].user_low) === user.id
+          ? Number(thr[0].user_high)
+          : Number(thr[0].user_low);
+      const excerpt =
+        text.length > 120 ? text.slice(0, 119).trimEnd() + "…" : text;
+      await safeNotify({
+        userId: peerId,
+        type: "nexo.dm",
+        title: `DM de @${user.username}`,
+        body: excerpt,
+        href: `/nexo?dm=${threadId}`,
+        actorId: user.id,
+        actorLabel: user.username,
+        payload: { threadId, messageId: Number(rows[0].id) },
+      });
 
       return NextResponse.json(
         {

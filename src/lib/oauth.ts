@@ -10,6 +10,7 @@ import { isOwnerUser } from "@/lib/ranks";
 import { getOAuthSiteUrl } from "@/lib/site";
 
 const STATE_COOKIE = "kc_oauth_state";
+const NEXT_COOKIE = "kc_oauth_next";
 const MAX_AGE_STATE = 60 * 10;
 
 export type OAuthProvider = "google" | "github";
@@ -39,6 +40,25 @@ export async function setOAuthState(state: string) {
     path: "/",
     maxAge: MAX_AGE_STATE,
   });
+}
+
+/** Destino post-OAuth (p.ej. /nexo?join=slug) */
+export async function setOAuthNext(nextPath: string) {
+  const jar = await cookies();
+  jar.set(NEXT_COOKIE, nextPath, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: MAX_AGE_STATE,
+  });
+}
+
+export async function consumeOAuthNext(): Promise<string | null> {
+  const jar = await cookies();
+  const v = jar.get(NEXT_COOKIE)?.value || null;
+  jar.delete(NEXT_COOKIE);
+  return v;
 }
 
 export async function consumeOAuthState(expected: string): Promise<boolean> {

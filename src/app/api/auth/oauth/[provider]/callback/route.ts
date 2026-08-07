@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { safeInternalPath } from "@/lib/auth-redirect";
 import {
+  consumeOAuthNext,
   consumeOAuthState,
   getOAuthRedirectUri,
   loginOrRegisterOAuth,
@@ -50,7 +52,9 @@ export async function GET(req: Request, { params }: Props) {
       const profile = await exchangeGithub(code);
       await loginOrRegisterOAuth(profile);
     }
-    return NextResponse.redirect(`${site}/forum`);
+    const nextCookie = await consumeOAuthNext();
+    const dest = safeInternalPath(nextCookie, "/forum");
+    return NextResponse.redirect(`${site}${dest}`);
   } catch (e) {
     console.error("[oauth callback]", e);
     const msg = e instanceof Error ? e.message : "oauth_fail";
