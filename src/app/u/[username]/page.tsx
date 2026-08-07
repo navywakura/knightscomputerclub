@@ -36,14 +36,49 @@ async function loadUser(username: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
   const u = await loadUser(username);
-  if (!u) return { title: "usuario" };
+  if (!u) {
+    return {
+      title: "usuario",
+      robots: { index: false, follow: true },
+    };
+  }
+  const handle = String(u.username);
   const name = u.display_name
-    ? `${u.display_name} (@${u.username})`
-    : `@${u.username}`;
+    ? `${u.display_name} (@${handle})`
+    : `@${handle}`;
+  const description = u.bio
+    ? String(u.bio).slice(0, 180)
+    : `Perfil de @${handle} en knightscomputer.club — nodo tecnoactivista`;
+  const path = `/u/${encodeURIComponent(handle)}`;
+  const ogImage = `${path}/opengraph-image`;
+
   return {
     title: name,
-    description: u.bio ? String(u.bio) : `Perfil de @${u.username} en knightscomputer.club`,
+    description,
     robots: { index: true, follow: true },
+    alternates: { canonical: path },
+    openGraph: {
+      title: name,
+      description,
+      type: "profile",
+      url: path,
+      siteName: "knightscomputer.club",
+      locale: "es_ES",
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 630,
+          alt: name,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: name,
+      description,
+      images: [ogImage],
+    },
   };
 }
 
