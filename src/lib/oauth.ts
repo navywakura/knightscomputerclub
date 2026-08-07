@@ -7,7 +7,7 @@ import {
 } from "@/lib/auth";
 import { ensureSchema, getDb, type UserRow } from "@/lib/db";
 import { isOwnerUser } from "@/lib/ranks";
-import { getSiteUrl } from "@/lib/site";
+import { getOAuthSiteUrl } from "@/lib/site";
 
 const STATE_COOKIE = "kc_oauth_state";
 const MAX_AGE_STATE = 60 * 10;
@@ -25,8 +25,9 @@ export function oauthConfigured(provider: OAuthProvider): boolean {
   );
 }
 
+/** Siempre www.knightscomputer.club (nunca localhost). */
 export function getOAuthRedirectUri(provider: OAuthProvider) {
-  return `${getSiteUrl()}/api/auth/oauth/${provider}/callback`;
+  return `${getOAuthSiteUrl()}/api/auth/oauth/${provider}/callback`;
 }
 
 export async function setOAuthState(state: string) {

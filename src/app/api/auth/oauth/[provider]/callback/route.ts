@@ -6,14 +6,15 @@ import {
   oauthConfigured,
   type OAuthProvider,
 } from "@/lib/oauth";
-import { getSiteUrl } from "@/lib/site";
+import { getOAuthSiteUrl } from "@/lib/site";
 
 type Props = { params: Promise<{ provider: string }> };
 
 export async function GET(req: Request, { params }: Props) {
   const { provider: raw } = await params;
   const provider = raw as OAuthProvider;
-  const site = getSiteUrl();
+  // Post-login siempre al dominio canónico (www), no a localhost / preview
+  const site = getOAuthSiteUrl();
 
   if (provider !== "google" && provider !== "github") {
     return NextResponse.redirect(`${site}/auth/login?error=provider`);
