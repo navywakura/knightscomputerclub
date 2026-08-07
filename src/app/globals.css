@@ -1229,6 +1229,59 @@ textarea {
   color: #000;
 }
 
+/* post body media */
+.post-body .post-image {
+  display: block;
+  max-width: min(100%, 720px);
+  max-height: 480px;
+  width: auto;
+  height: auto;
+  margin: 10px 0;
+  border: 1px solid var(--border);
+  background: #040a05;
+}
+
+.post-body .post-link {
+  color: var(--cyan);
+  word-break: break-all;
+}
+
+.compose-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.image-attach {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.oauth-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.oauth-btn {
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+
+.share-btn {
+  color: var(--cyan);
+  border-color: rgba(80, 200, 220, 0.4);
+}
+
+.share-btn:hover:not(:disabled) {
+  color: #9ff;
+  border-color: var(--cyan);
+}
+
 /* ——— mod / admin ——— */
 .mod-btn {
   font-family: var(--font-ui);

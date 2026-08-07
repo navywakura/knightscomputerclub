@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import ImageAttach from "@/components/ImageAttach";
 
 export default function ReplyForm({ threadId }: { threadId: number }) {
   const router = useRouter();
@@ -41,13 +42,19 @@ export default function ReplyForm({ threadId }: { threadId: number }) {
         id="reply"
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder="escribí señal, no ruido…"
+        placeholder="escribí señal, no ruido… · podés adjuntar imagen"
         required
         maxLength={20000}
       />
-      <button className="btn" type="submit" disabled={loading}>
-        {loading ? "enviando…" : "[ post reply ]"}
-      </button>
+      <div className="compose-toolbar">
+        <ImageAttach
+          disabled={loading}
+          onInsert={(md) => setBody((b) => (b ? b + md : md.trim() + "\n"))}
+        />
+        <button className="btn" type="submit" disabled={loading}>
+          {loading ? "enviando…" : "[ post reply ]"}
+        </button>
+      </div>
     </form>
   );
 }

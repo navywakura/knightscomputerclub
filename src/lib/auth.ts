@@ -19,6 +19,8 @@ export async function hashPassword(password: string) {
 }
 
 export async function verifyPassword(password: string, hash: string) {
+  // Cuentas solo-OAuth no aceptan password local
+  if (!hash || hash.startsWith("oauth:")) return false;
   return bcrypt.compare(password, hash);
 }
 

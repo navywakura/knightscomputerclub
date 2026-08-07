@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import Panel from "@/components/Panel";
+import ImageAttach from "@/components/ImageAttach";
 
 type Cat = { slug: string; name: string };
 
@@ -118,11 +119,21 @@ function NewThreadForm() {
           required
           minLength={3}
           maxLength={20000}
-          placeholder="primer mensaje…"
+          placeholder="primer mensaje… · podés adjuntar imagen"
         />
-        <button className="btn" type="submit" disabled={loading || authed === null}>
-          {loading ? "creando…" : "[ create thread ]"}
-        </button>
+        <div className="compose-toolbar">
+          <ImageAttach
+            disabled={loading}
+            onInsert={(md) => setBody((b) => (b ? b + md : md.trim() + "\n"))}
+          />
+          <button
+            className="btn"
+            type="submit"
+            disabled={loading || authed === null}
+          >
+            {loading ? "creando…" : "[ create thread ]"}
+          </button>
+        </div>
       </form>
     </Panel>
   );

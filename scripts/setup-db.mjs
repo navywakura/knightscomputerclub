@@ -61,6 +61,26 @@ async function main() {
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE
   `;
+  await sql`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS oauth_provider VARCHAR(32)
+  `;
+  await sql`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS oauth_subject VARCHAR(128)
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS media (
+      id SERIAL PRIMARY KEY,
+      uploader_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      mime VARCHAR(64) NOT NULL,
+      size_bytes INT NOT NULL,
+      data BYTEA NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_media_uploader ON media(uploader_id)`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS categories (

@@ -4,12 +4,15 @@ import { notFound } from "next/navigation";
 import Panel from "@/components/Panel";
 import ReplyForm from "@/components/ReplyForm";
 import RankBadge from "@/components/RankBadge";
+import PostBody from "@/components/PostBody";
+import ShareButton from "@/components/ShareButton";
 import {
   DeletePostButton,
   DeleteThreadButton,
 } from "@/components/ModControls";
 import { getSessionUser } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
+import { excerptBody } from "@/lib/markdown";
 import {
   getRank,
   isOwnerUser,
@@ -21,12 +24,6 @@ import {
 export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ id: string }> };
-
-function excerpt(text: string, max = 180) {
-  const t = text.replace(/\s+/g, " ").trim();
-  if (t.length <= max) return t;
-  return t.slice(0, max - 1).trimEnd() + "…";
-}
 
 async function loadThreadMeta(threadId: number) {
   try {
@@ -76,7 +73,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const board = String(row.category_name);
   const body = row.first_body ? String(row.first_body) : "";
   const description =
-    excerpt(body) ||
+    excerptBody(body) ||
     `Hilo en ${board} por @${author} · knightscomputer.club`;
   const path = `/forum/thread/${threadId}`;
   const ogTitle = `${title} · ${board}`;
@@ -235,9 +232,12 @@ export default async function ThreadPage({ params }: Props) {
         const postCls = rankPostClass(rank);
         const canDeletePost =
           isOwner || (user ? Number(p.author_id) === user.id : false);
+        const postId = p.id as number;
+        const sharePath = `/forum/post/${postId}`;
         return (
           <article
-            key={p.id as number}
+            key={postId}
+            id={`post-${postId}`}
             className={`post${postCls ? ` ${postCls}` : ""}`}
           >
             <div className="post-meta">
@@ -255,14 +255,19 @@ export default async function ThreadPage({ params }: Props) {
               </span>
               <span className="role">{String(p.author_role)}</span>
               <span>{new Date(String(p.created_at)).toLocaleString()}</span>
+              <ShareButton
+                path={sharePath}
+                title={String(thread.title)}
+                text={excerptBody(String(p.body), 120)}
+              />
               {canDeletePost ? (
                 <DeletePostButton
-                  postId={p.id as number}
+                  postId={postId}
                   categorySlug={categorySlug}
                 />
               ) : null}
             </div>
-            <div className="post-body">{String(p.body)}</div>
+            <PostBody body={String(p.body)} />
           </article>
         );
       })}

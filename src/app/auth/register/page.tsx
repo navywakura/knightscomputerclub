@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import Panel from "@/components/Panel";
+import OAuthButtons from "@/components/OAuthButtons";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -44,6 +45,13 @@ export default function RegisterPage() {
         username 3–32 · a-z 0-9 _ - · password ≥ 8 · sin verificación de
         email (aún)
       </p>
+      <div style={{ maxWidth: 420, marginBottom: 16 }}>
+        <p className="muted" style={{ marginBottom: 8 }}>
+          o registrate con:
+        </p>
+        <OAuthButtons />
+      </div>
+      <hr className="hr" />
       <form onSubmit={onSubmit} style={{ maxWidth: 420 }}>
         {error && <div className="form-error">{error}</div>}
         <label htmlFor="username">username</label>
