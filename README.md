@@ -68,6 +68,18 @@ npx vercel
 | `/auth/login` | Login |
 | `/auth/register` | Registro |
 | `POST /api/admin/vip` | Marcar donante como VIP (`ADMIN_SECRET`) |
+| `/api/notifications` | Inbox in-app (GET / PATCH) |
+| `/admin` | Panel owner (ban/VIP/borrar) |
+
+## Notificaciones (kit portable)
+
+El inbox usa **`packages/web-notify`** — copiable a otras webs.
+
+- Campana `[n]` en el header (logueado)
+- Eventos: reply en hilo, VIP, ban/unban
+- Multi-app: `NOTIFY_APP_ID` (default `knightscomputer`)
+
+Guía de export: [`packages/web-notify/README.md`](packages/web-notify/README.md)
 
 ## VIP (donantes)
 

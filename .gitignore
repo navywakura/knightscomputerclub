@@ -26,3 +26,8 @@ next-env.d.ts
 
 # master logo source (6MB+); use public/knightslabs_logo.png in the app
 /knightslabs_logo.png
+
+# audio (local only)
+*.mp3
+*.wav
+*.flac
