@@ -5407,6 +5407,145 @@ body.nexo-app-active footer {
   margin-top: 16px;
 }
 
+/* likes */
+.post-like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  min-height: 28px;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+
+.post-like-btn:hover:not(:disabled) {
+  border-color: #5a2a32;
+  color: #ff6b7a;
+}
+
+.post-like-btn.on {
+  color: #ff3344;
+  border-color: color-mix(in srgb, #ff3344 40%, transparent);
+  background: color-mix(in srgb, #ff3344 10%, transparent);
+}
+
+.post-like-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.post-like-heart {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.post-like-btn.on .post-like-heart {
+  color: #ff3344;
+  text-shadow: 0 0 8px rgba(255, 51, 68, 0.45);
+}
+
+.post-like-count {
+  font-variant-numeric: tabular-nums;
+  min-width: 1ch;
+}
+
+/* follows */
+.follow-block {
+  margin: 10px 0 12px;
+}
+
+.follow-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.follow-stat {
+  background: none;
+  border: none;
+  color: var(--pt-muted, var(--text-dim));
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.follow-stat strong {
+  color: var(--pt-accent, var(--green));
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.follow-btn {
+  font-size: 0.8rem !important;
+  padding: 4px 10px !important;
+  min-height: 32px;
+}
+
+.follow-list-panel {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--pt-card-border, var(--border));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--pt-btn-bg, #050a06) 90%, transparent);
+  max-height: 220px;
+  overflow: auto;
+}
+
+.follow-list-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pt-accent, var(--green));
+  margin-bottom: 8px;
+}
+
+.follow-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.follow-list li a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: none;
+  color: var(--pt-text, var(--text));
+  font-size: 0.88rem;
+}
+
+.follow-av {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--pt-card-border, var(--border));
+  display: grid;
+  place-items: center;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  background: #0a100c;
+  color: var(--pt-accent, var(--green));
+  flex-shrink: 0;
+}
+
+/* ocultar muzak global cuando suena soundtrack del perfil */
+body.profile-music-active .muzak-player {
+  display: none !important;
+}
+
 /* feed de posts del usuario */
 .profile-feed {
   position: relative;

@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  pauseAmbientForProfile,
+  resumeAmbientFromProfile,
+} from "@/lib/ambient-control";
 
 type Props = {
   src: string;
@@ -8,8 +12,8 @@ type Props = {
 };
 
 /**
- * Música ambient del perfil público. Autoplay cuando el browser lo permite;
- * si no, un toque en play. Loop + volumen bajo por defecto.
+ * Soundtrack del perfil. Pausa el ambient global mientras está montado
+ * (solo 1 canción: la del perfil o, si no hay, el muzak por defecto).
  */
 export default function ProfileMusicPlayer({
   src,
@@ -22,6 +26,9 @@ export default function ProfileMusicPlayer({
   const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
+    // apagar playlist global del nodo
+    pauseAmbientForProfile();
+
     const a = new Audio(src);
     a.loop = true;
     a.preload = "auto";
@@ -46,6 +53,7 @@ export default function ProfileMusicPlayer({
       a.pause();
       a.src = "";
       audioRef.current = null;
+      resumeAmbientFromProfile();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reiniciar solo si cambia src
   }, [src]);

@@ -2,6 +2,11 @@
 
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  isProfileMusicActive,
+  registerAmbientAudio,
+  setAmbientWasPlaying,
+} from "@/lib/ambient-control";
 import { playlistForPath, type PlaylistId, type Track } from "@/lib/playlists";
 
 const STATE_KEY = "kc_muzak_state_v1";
@@ -116,22 +121,30 @@ function getAudio(): HTMLAudioElement | null {
     a.volume = shared.muted ? 0 : shared.volume;
     a.muted = shared.muted;
     shared.audio = a;
+    registerAmbientAudio(a);
   }
   return shared.audio;
 }
 
 /** Intenta autoplay; si el browser bloquea, reanuda en el primer gesto. */
 function tryAutoplay(a: HTMLAudioElement): Promise<boolean> {
+  // Perfil con MP3 propio: no competir
+  if (isProfileMusicActive()) {
+    a.pause();
+    return Promise.resolve(false);
+  }
   return a
     .play()
     .then(() => {
       shared.wasPlaying = true;
+      setAmbientWasPlaying(true);
       persistNow();
       return true;
     })
     .catch(() => {
       // Mantener intención de reproducir; desbloquear con gesto
       shared.wasPlaying = true;
+      setAmbientWasPlaying(true);
       persistNow();
       bindGestureUnlock(a);
       return false;
@@ -350,7 +363,12 @@ export default function AmbientMusicPlayer() {
     };
     const onMeta = () => setDuration(a.duration || 0);
     const onPlay = () => {
+      if (isProfileMusicActive()) {
+        a.pause();
+        return;
+      }
       shared.wasPlaying = true;
+      setAmbientWasPlaying(true);
       setPlaying(true);
       persistNow();
     };
@@ -401,6 +419,13 @@ export default function AmbientMusicPlayer() {
   useEffect(() => {
     const a = getAudio();
     if (!a || !shared.hydrated) return;
+
+    // en perfiles con soundtrack propio, ambient calla
+    if (isProfileMusicActive()) {
+      a.pause();
+      setPlaying(false);
+      return;
+    }
 
     if (shared.playlistId === playlist.id) {
       setIndex(shared.index);

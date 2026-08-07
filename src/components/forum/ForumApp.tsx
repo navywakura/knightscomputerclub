@@ -14,6 +14,7 @@ import PostBody from "@/components/PostBody";
 import RankBadge from "@/components/RankBadge";
 import ReplyForm from "@/components/ReplyForm";
 import ShareButton from "@/components/ShareButton";
+import PostLikeButton from "@/components/PostLikeButton";
 import { getRank, isOwnerUser, rankNameClass, rankPostClass, rankUserClass } from "@/lib/ranks";
 import { excerptBody } from "@/lib/markdown";
 import type { LinkPreview } from "@/lib/link-preview";
@@ -65,6 +66,8 @@ type PostRow = {
   author_avatar_url?: string | null;
   pgp_fingerprint?: string | null;
   pgp_signature?: string | null;
+  like_count?: number;
+  liked_by_me?: boolean;
 };
 
 type ThreadDetail = {
@@ -963,7 +966,7 @@ export default function ForumApp({
               <div className="forum-pad forum-welcome">
                 <h1 className="forum-h1">FORO DEL NODO</h1>
                 <p className="muted">
-                  elegí un board a la izquierda. sin likes. sin feed
+                  elegí un board a la izquierda. likes con ♥. sin feed
                   algorítmico. solo texto. offtopic sin NSFW.
                 </p>
                 <div className="forum-quick">
@@ -1183,6 +1186,12 @@ export default function ForumApp({
                         <span>
                           {new Date(p.created_at).toLocaleString()}
                         </span>
+                        <PostLikeButton
+                          postId={Number(p.id)}
+                          initialCount={Number(p.like_count || 0)}
+                          initialLiked={Boolean(p.liked_by_me)}
+                          disabled={!me}
+                        />
                         <ShareButton
                           path={`/forum/post/${p.id}`}
                           title={thread.title}

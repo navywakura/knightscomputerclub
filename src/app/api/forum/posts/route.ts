@@ -57,12 +57,28 @@ export async function GET(req: Request) {
         u.display_name AS author_display_name,
         u.role AS author_role,
         u.is_vip AS author_is_vip,
-        u.avatar_media_id AS author_avatar_media_id
+        u.avatar_media_id AS author_avatar_media_id,
+        (SELECT COUNT(*)::int FROM post_likes pl WHERE pl.post_id = p.id) AS like_count
       FROM posts p
       JOIN users u ON u.id = p.author_id
       WHERE p.thread_id = ${threadId}
       ORDER BY p.created_at ASC
     `;
+
+    const postIds = posts.map((p) => Number(p.id));
+    const likedSet = new Set<number>();
+    if (user && postIds.length) {
+      try {
+        const mine = await db`
+          SELECT post_id FROM post_likes
+          WHERE user_id = ${user.id}
+            AND post_id = ANY(${postIds})
+        `;
+        for (const r of mine) likedSet.add(Number(r.post_id));
+      } catch {
+        /* tabla aún no migrada */
+      }
+    }
 
     // Open Graph embeds por post (cache + fetch)
     let previews: Record<string, LinkPreview[]> = {};
@@ -80,15 +96,20 @@ export async function GET(req: Request) {
       console.error("[posts GET previews]", e);
     }
 
-    const mapAuthor = (r: Record<string, unknown>) => ({
-      ...r,
-      author_avatar_url: r.author_avatar_media_id
-        ? `/api/media/${r.author_avatar_media_id}`
-        : null,
-      author_display_name: r.author_display_name
-        ? String(r.author_display_name)
-        : null,
-    });
+    const mapAuthor = (r: Record<string, unknown>) => {
+      const id = Number(r.id);
+      return {
+        ...r,
+        author_avatar_url: r.author_avatar_media_id
+          ? `/api/media/${r.author_avatar_media_id}`
+          : null,
+        author_display_name: r.author_display_name
+          ? String(r.author_display_name)
+          : null,
+        like_count: Number(r.like_count || 0),
+        liked_by_me: likedSet.has(id),
+      };
+    };
 
     return NextResponse.json({
       thread: mapAuthor(threads[0] as Record<string, unknown>),

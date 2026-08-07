@@ -5,8 +5,9 @@ import { notFound } from "next/navigation";
 import RankBadge from "@/components/RankBadge";
 import ShareButton from "@/components/ShareButton";
 import ProfileMusicPlayer from "@/components/ProfileMusicPlayer";
+import FollowButton from "@/components/FollowButton";
 import { ensureSchema, getDb } from "@/lib/db";
-import { parseConnections } from "@/lib/auth";
+import { getSessionUser, parseConnections } from "@/lib/auth";
 import { getRank, rankNameClass } from "@/lib/ranks";
 import { excerptBody } from "@/lib/markdown";
 import {
@@ -131,6 +132,7 @@ export default async function PublicProfilePage({ params }: Props) {
   const { username } = await params;
   const u = await loadUser(username);
   if (!u) notFound();
+  const session = await getSessionUser().catch(() => null);
 
   const rank = getRank({
     role: String(u.role),
@@ -304,6 +306,11 @@ export default async function PublicProfilePage({ params }: Props) {
             {new Date(String(u.created_at)).toLocaleDateString()}
             <span className="profile-theme-badge"> · tema: {theme.name}</span>
           </p>
+          <FollowButton
+            username={handle}
+            isSelf={Boolean(session && session.id === Number(u.id))}
+            loggedIn={Boolean(session && !session.banned)}
+          />
           {u.bio ? (
             <p className="profile-public-bio">{String(u.bio)}</p>
           ) : null}

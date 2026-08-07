@@ -294,6 +294,43 @@ export async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_friendships_status ON friendships(status)
   `;
 
+  // Seguir usuarios (one-way, distinto de amistad)
+  await db`
+    CREATE TABLE IF NOT EXISTS follows (
+      follower_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      following_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (follower_id, following_id),
+      CHECK (follower_id <> following_id)
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_follows_following
+      ON follows (following_id)
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_follows_follower
+      ON follows (follower_id)
+  `;
+
+  // Likes en posts del foro
+  await db`
+    CREATE TABLE IF NOT EXISTS post_likes (
+      post_id INT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+      user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (post_id, user_id)
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_post_likes_user
+      ON post_likes (user_id)
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_post_likes_post
+      ON post_likes (post_id)
+  `;
+
   // ── NEXO: tablones de usuario + chat casi real-time + DMs ──
   await db`
     CREATE TABLE IF NOT EXISTS nexo_boards (
