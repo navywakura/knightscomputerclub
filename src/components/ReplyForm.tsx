@@ -42,7 +42,7 @@ export default function ReplyForm({ threadId }: { threadId: number }) {
         id="reply"
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder="escribí señal, no ruido… · podés adjuntar imagen"
+        placeholder="reply en texto plano (sin markdown) · links generan embed OG · podés adjuntar imagen"
         required
         maxLength={20000}
       />

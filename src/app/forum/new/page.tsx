@@ -78,7 +78,12 @@ function NewThreadForm() {
   return (
     <Panel title="~/forum · new_thread">
       <h1>NUEVO HILO</h1>
-      <p className="muted">señal &gt; ruido. título claro, body con contexto.</p>
+      <p className="muted">
+        señal &gt; ruido. título claro, body con contexto.{" "}
+        <strong>Markdown</strong> soportado en el primer post (GFM: **negrita**,
+        listas, código, links, imágenes). Los replies van en texto plano +
+        embeds de links.
+      </p>
       <form onSubmit={onSubmit}>
         {error && <div className="form-error">{error}</div>}
         <label htmlFor="category">board</label>
@@ -119,7 +124,7 @@ function NewThreadForm() {
           required
           minLength={3}
           maxLength={20000}
-          placeholder="primer mensaje… · podés adjuntar imagen"
+          placeholder={"primer mensaje (markdown OK)\n\n**bold** · `code` · [link](https://…)\n![img](/api/media/…)"}
         />
         <div className="compose-toolbar">
           <ImageAttach

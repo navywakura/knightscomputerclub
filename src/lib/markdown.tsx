@@ -2,13 +2,17 @@ import type { ReactNode } from "react";
 
 const IMG_MD = /!\[([^\]]*)\]\(([^)\s]+)\)/g;
 const LINK_MD = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
-const BARE_URL = /(https?:\/\/[^\s<]+[^\s<.,;:!?"')\]])/g;
 const MEDIA_IN_BODY = /\/api\/media\/(\d+)/g;
+const MD_STRIP =
+  /[`*_~#>|\-\[\]()!]|^\s{0,3}#{1,6}\s+/gm;
 
 export function plainTextFromBody(body: string): string {
   return body
     .replace(IMG_MD, "[imagen]")
     .replace(LINK_MD, "$1")
+    .replace(MD_STRIP, "")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]+)`/g, "$1")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -35,8 +39,11 @@ export function firstImageUrl(body: string): string | null {
   return null;
 }
 
-/** Render mínimo seguro: saltos de línea, imágenes md, links */
-export function renderPostBody(body: string): ReactNode[] {
+/**
+ * Render simple para replies/comentarios: sin markdown de formato,
+ * solo saltos de línea, imágenes md y links.
+ */
+export function renderPlainBody(body: string): ReactNode[] {
   const lines = body.split("\n");
   const nodes: ReactNode[] = [];
 
@@ -49,7 +56,6 @@ export function renderPostBody(body: string): ReactNode[] {
 }
 
 function renderInline(text: string, lineKey: number): ReactNode[] {
-  // Tokenize images first, then links, then bare urls
   type Part =
     | { t: "text"; v: string }
     | { t: "img"; alt: string; src: string }

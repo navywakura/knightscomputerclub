@@ -13,6 +13,7 @@ import {
 import { getSessionUser } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
 import { excerptBody } from "@/lib/markdown";
+import { previewsForPosts } from "@/lib/link-preview";
 import {
   getRank,
   isOwnerUser,
@@ -184,6 +185,12 @@ export default async function ThreadPage({ params }: Props) {
   const canDeleteThread = isOwner || isThreadAuthor;
   const categorySlug = String(thread.category_slug || "");
 
+  // Markdown solo en el OP (#1); replies/comentarios = plain + embeds
+  // Embeds Open Graph externos: en todos los mensajes del hilo
+  const previewMap = await previewsForPosts(
+    posts.map((p) => ({ id: p.id as number, body: String(p.body || "") }))
+  ).catch(() => new Map());
+
   return (
     <>
       <div className="breadcrumbs">
@@ -267,7 +274,11 @@ export default async function ThreadPage({ params }: Props) {
                 />
               ) : null}
             </div>
-            <PostBody body={String(p.body)} />
+            <PostBody
+              body={String(p.body)}
+              mode={i === 0 ? "markdown" : "plain"}
+              previews={previewMap.get(postId) || []}
+            />
           </article>
         );
       })}

@@ -103,6 +103,19 @@ export async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_posts_thread ON posts(thread_id)
   `;
 
+  await db`
+    CREATE TABLE IF NOT EXISTS link_previews (
+      url TEXT PRIMARY KEY,
+      final_url TEXT NOT NULL DEFAULT '',
+      title TEXT,
+      description TEXT,
+      image TEXT,
+      site_name TEXT,
+      ok BOOLEAN NOT NULL DEFAULT FALSE,
+      fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
   // Seed default categories if empty
   const existing = await db`SELECT COUNT(*)::int AS n FROM categories`;
   if (existing[0]?.n === 0) {

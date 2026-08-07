@@ -9,6 +9,7 @@ import { DeletePostButton } from "@/components/ModControls";
 import { getSessionUser } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
 import { excerptBody, firstImageUrl, plainTextFromBody } from "@/lib/markdown";
+import { previewsForBody } from "@/lib/link-preview";
 import {
   getRank,
   isOwnerUser,
@@ -128,6 +129,24 @@ export default async function PostPage({ params }: Props) {
     (isOwnerUser(user) || Number(post.author_id) === user.id);
   const path = `/forum/post/${postId}`;
   const threadId = Number(post.thread_id);
+  const body = String(post.body || "");
+  const previews = await previewsForBody(body).catch(() => []);
+
+  // ¿Es el OP del hilo? → markdown; si es reply, plain (como en el thread)
+  let isOp = true;
+  try {
+    await ensureSchema();
+    const db = getDb();
+    const first = await db`
+      SELECT id FROM posts
+      WHERE thread_id = ${threadId}
+      ORDER BY created_at ASC
+      LIMIT 1
+    `;
+    isOp = Boolean(first[0] && Number(first[0].id) === postId);
+  } catch {
+    isOp = true;
+  }
 
   return (
     <>
@@ -190,7 +209,11 @@ export default async function PostPage({ params }: Props) {
             />
           ) : null}
         </div>
-        <PostBody body={String(post.body)} />
+        <PostBody
+          body={body}
+          mode={isOp ? "markdown" : "plain"}
+          previews={previews}
+        />
       </article>
     </>
   );
