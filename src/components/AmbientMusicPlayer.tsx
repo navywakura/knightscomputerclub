@@ -1,30 +1,94 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { playlistForPath, type Track } from "@/lib/playlists";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { playlistForPath, type PlaylistId, type Track } from "@/lib/playlists";
 
 const VOL_KEY = "kc_muzak_vol";
 const MUTE_KEY = "kc_muzak_muted";
 
 /**
+ * Estado + Audio fuera de React: sobrevive a remounts y a cambios de ruta
+ * (forum ↔ donate no reinician la canción).
+ */
+type SharedMuzak = {
+  audio: HTMLAudioElement | null;
+  playlistId: PlaylistId | null;
+  index: number;
+  wasPlaying: boolean;
+  volume: number;
+  muted: boolean;
+};
+
+const shared: SharedMuzak = {
+  audio: null,
+  playlistId: null,
+  index: 0,
+  wasPlaying: false,
+  volume: 0.35,
+  muted: false,
+};
+
+function getAudio(): HTMLAudioElement | null {
+  if (typeof window === "undefined") return null;
+  if (!shared.audio) {
+    const a = new Audio();
+    a.preload = "metadata";
+    a.volume = shared.muted ? 0 : shared.volume;
+    a.muted = shared.muted;
+    shared.audio = a;
+  }
+  return shared.audio;
+}
+
+function loadTrack(a: HTMLAudioElement, src: string, resume: boolean) {
+  const current = a.getAttribute("data-src");
+  if (current === src) {
+    if (resume && a.paused) {
+      a.play().catch(() => {
+        shared.wasPlaying = false;
+      });
+    }
+    return;
+  }
+  const t = a.currentTime;
+  a.setAttribute("data-src", src);
+  a.src = src;
+  a.load();
+  // solo resetear posición si cambió de archivo
+  if (current) {
+    a.currentTime = 0;
+  } else if (t > 0) {
+    // no-op: nuevo elemento
+  }
+  if (resume) {
+    a.play()
+      .then(() => {
+        shared.wasPlaying = true;
+      })
+      .catch(() => {
+        shared.wasPlaying = false;
+      });
+  }
+}
+
+/**
  * Mini reproductor global.
- * HOME (/) → /reproductormp3/playlist_para_home
- * /forum y /donate → /reproductormp3/playlist_para_forum_y_donate
+ * HOME (/) → playlist_para_home
+ * resto (forum/donate/auth) → playlist_para_forum_y_donate
+ * Misma zona = misma playlist = audio continuo al navegar.
  */
 export default function AmbientMusicPlayer() {
   const path = usePathname() || "/";
   const playlist = useMemo(() => playlistForPath(path), [path]);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [index, setIndex] = useState(0);
+
+  const [index, setIndex] = useState(shared.index);
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [volume, setVolume] = useState(0.35);
+  const [muted, setMuted] = useState(shared.muted);
+  const [volume, setVolume] = useState(shared.volume);
   const [expanded, setExpanded] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-  const wasPlaying = useRef(false);
-  const playlistIdRef = useRef<string | null>(null);
 
   const safeIndex = playlist.tracks.length
     ? index % playlist.tracks.length
@@ -34,130 +98,184 @@ export default function AmbientMusicPlayer() {
   // zona body class (solo home cambia estética)
   useEffect(() => {
     const isHome = path === "/" || path === "";
-    document.body.classList.toggle("zone-home", isHome);
-    document.body.classList.toggle("zone-ops", !isHome);
-    return () => {
-      document.body.classList.remove("zone-home", "zone-ops");
-    };
+    document.body.classList.add(isHome ? "zone-home" : "zone-ops");
+    document.body.classList.remove(isHome ? "zone-ops" : "zone-home");
+    // no limpiar en unmount por cambio de ruta: el cleanup
+    // entre navigations apagaba clases y forzaba reflow innecesario
   }, [path]);
 
-  // volume / mute persist
+  // volume / mute desde storage (una vez)
   useEffect(() => {
     try {
       const v = localStorage.getItem(VOL_KEY);
-      if (v != null) setVolume(Math.min(1, Math.max(0, Number(v))));
+      if (v != null) {
+        const n = Math.min(1, Math.max(0, Number(v)));
+        shared.volume = n;
+        setVolume(n);
+      }
       const m = localStorage.getItem(MUTE_KEY);
-      if (m === "1") setMuted(true);
+      if (m === "1") {
+        shared.muted = true;
+        setMuted(true);
+      }
     } catch {
       /* ignore */
     }
+    const a = getAudio();
+    if (a) {
+      a.volume = shared.muted ? 0 : shared.volume;
+      a.muted = shared.muted;
+      setPlaying(!a.paused && !a.ended);
+      setProgress(a.currentTime || 0);
+      setDuration(a.duration || 0);
+      // rehidratar índice si ya había playlist
+      if (shared.playlistId === playlist.id) {
+        setIndex(shared.index);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    const a = audioRef.current;
+    const a = getAudio();
     if (!a) return;
+    shared.volume = volume;
+    shared.muted = muted;
     a.volume = muted ? 0 : volume;
     a.muted = muted;
   }, [volume, muted]);
 
-  // cambio de playlist al navegar entre zonas (home ↔ forum/donate)
+  // listeners del audio singleton (una vez)
   useEffect(() => {
-    const a = audioRef.current;
+    const a = getAudio();
     if (!a) return;
 
-    if (playlistIdRef.current === playlist.id) return;
-    playlistIdRef.current = playlist.id;
+    const onTime = () => setProgress(a.currentTime);
+    const onMeta = () => setDuration(a.duration || 0);
+    const onPlay = () => {
+      shared.wasPlaying = true;
+      setPlaying(true);
+    };
+    const onPause = () => {
+      // no marcar wasPlaying=false aquí: un load() dispara pause
+      setPlaying(false);
+    };
+    const onEnded = () => {
+      shared.wasPlaying = true;
+      setIndex((i) => {
+        const len = Math.max(
+          (playlistForPath(
+            typeof window !== "undefined" ? window.location.pathname : "/"
+          ).tracks.length || 1),
+          1
+        );
+        const next = (i + 1) % len;
+        shared.index = next;
+        return next;
+      });
+    };
 
-    const keep = wasPlaying.current || playing;
-    const first = playlist.tracks[0];
+    a.addEventListener("timeupdate", onTime);
+    a.addEventListener("loadedmetadata", onMeta);
+    a.addEventListener("play", onPlay);
+    a.addEventListener("pause", onPause);
+    a.addEventListener("ended", onEnded);
+
+    return () => {
+      a.removeEventListener("timeupdate", onTime);
+      a.removeEventListener("loadedmetadata", onMeta);
+      a.removeEventListener("play", onPlay);
+      a.removeEventListener("pause", onPause);
+      a.removeEventListener("ended", onEnded);
+    };
+  }, []);
+
+  // solo cambiar audio al cambiar de ZONA (home ↔ ops), no entre subpáginas
+  useEffect(() => {
+    const a = getAudio();
+    if (!a) return;
+
+    if (shared.playlistId === playlist.id) {
+      // misma playlist: no tocar src; solo sincronizar UI
+      setIndex(shared.index);
+      setPlaying(!a.paused && !a.ended);
+      return;
+    }
+
+    // zona nueva → reiniciar en track 0 de la nueva playlist
+    const keep = shared.wasPlaying || !a.paused;
+    shared.playlistId = playlist.id;
+    shared.index = 0;
     setIndex(0);
     setProgress(0);
     setDuration(0);
 
-    a.pause();
-    a.removeAttribute("data-src");
-    a.removeAttribute("src");
-    a.load();
-
+    const first = playlist.tracks[0];
     if (!first) {
+      a.pause();
       setPlaying(false);
       return;
     }
 
-    a.src = first.src;
-    a.setAttribute("data-src", first.src);
-    a.load();
+    loadTrack(a, first.src, keep);
+    setPlaying(keep);
+  }, [playlist.id, playlist]);
 
-    if (keep) {
-      a.play()
-        .then(() => {
-          setPlaying(true);
-          wasPlaying.current = true;
-        })
-        .catch(() => setPlaying(false));
-    } else {
-      setPlaying(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar de playlist
-  }, [playlist.id, playlist.tracks]);
-
-  // load track when index changes within same playlist
+  // cambio de track (next/prev/list) dentro de la misma playlist
   useEffect(() => {
-    const a = audioRef.current;
+    const a = getAudio();
     if (!a || !track) return;
-    if (playlistIdRef.current !== playlist.id) return;
-    if (a.getAttribute("data-src") === track.src) return;
+    if (shared.playlistId !== playlist.id) return;
 
-    const resume = wasPlaying.current || playing;
-    a.setAttribute("data-src", track.src);
-    a.src = track.src;
-    a.load();
-    setProgress(0);
-
-    if (resume) {
-      a.play()
-        .then(() => setPlaying(true))
-        .catch(() => setPlaying(false));
-    }
-  }, [track, playlist.id, playing]);
+    shared.index = safeIndex;
+    const resume = shared.wasPlaying || !a.paused || playing;
+    loadTrack(a, track.src, resume);
+  }, [safeIndex, track, playlist.id, playing]);
 
   const next = useCallback(() => {
-    setIndex((i) => (i + 1) % Math.max(playlist.tracks.length, 1));
-    wasPlaying.current = true;
+    shared.wasPlaying = true;
+    setIndex((i) => {
+      const n = (i + 1) % Math.max(playlist.tracks.length, 1);
+      shared.index = n;
+      return n;
+    });
   }, [playlist.tracks.length]);
 
   const prev = useCallback(() => {
-    setIndex((i) =>
-      i <= 0 ? Math.max(playlist.tracks.length - 1, 0) : i - 1
-    );
-    wasPlaying.current = true;
+    shared.wasPlaying = true;
+    setIndex((i) => {
+      const n =
+        i <= 0 ? Math.max(playlist.tracks.length - 1, 0) : i - 1;
+      shared.index = n;
+      return n;
+    });
   }, [playlist.tracks.length]);
 
   async function toggle() {
-    const a = audioRef.current;
+    const a = getAudio();
     if (!a) return;
-    if (playing) {
+    if (!a.paused) {
       a.pause();
+      shared.wasPlaying = false;
       setPlaying(false);
-      wasPlaying.current = false;
       return;
     }
     try {
       if (!a.getAttribute("data-src") && track) {
-        a.src = track.src;
-        a.setAttribute("data-src", track.src);
-        a.load();
+        loadTrack(a, track.src, false);
       }
       await a.play();
+      shared.wasPlaying = true;
       setPlaying(true);
-      wasPlaying.current = true;
     } catch {
+      shared.wasPlaying = false;
       setPlaying(false);
     }
   }
 
   function onVol(v: number) {
     setVolume(v);
+    shared.volume = v;
     try {
       localStorage.setItem(VOL_KEY, String(v));
     } catch {
@@ -165,6 +283,7 @@ export default function AmbientMusicPlayer() {
     }
     if (v > 0 && muted) {
       setMuted(false);
+      shared.muted = false;
       try {
         localStorage.setItem(MUTE_KEY, "0");
       } catch {
@@ -176,6 +295,7 @@ export default function AmbientMusicPlayer() {
   function toggleMute() {
     setMuted((m) => {
       const nextM = !m;
+      shared.muted = nextM;
       try {
         localStorage.setItem(MUTE_KEY, nextM ? "1" : "0");
       } catch {
@@ -186,7 +306,7 @@ export default function AmbientMusicPlayer() {
   }
 
   function seek(ratio: number) {
-    const a = audioRef.current;
+    const a = getAudio();
     if (!a || !duration) return;
     a.currentTime = ratio * duration;
     setProgress(a.currentTime);
@@ -209,28 +329,6 @@ export default function AmbientMusicPlayer() {
       role="region"
       aria-label="Ambient music player"
     >
-      <audio
-        ref={audioRef}
-        preload="metadata"
-        onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime)}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
-        onError={() => {
-          // si un track falla (p.ej. codec), saltar al siguiente
-          if (playlist.tracks.length > 1) {
-            wasPlaying.current = playing;
-            next();
-          } else {
-            setPlaying(false);
-          }
-        }}
-        onEnded={() => {
-          wasPlaying.current = true;
-          next();
-        }}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-      />
-
       <button
         type="button"
         className="muzak-toggle"
@@ -318,7 +416,8 @@ export default function AmbientMusicPlayer() {
                     type="button"
                     className={i === safeIndex ? "on" : ""}
                     onClick={() => {
-                      wasPlaying.current = true;
+                      shared.wasPlaying = true;
+                      shared.index = i;
                       setIndex(i);
                       setPlaying(true);
                     }}
