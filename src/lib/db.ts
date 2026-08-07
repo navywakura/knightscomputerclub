@@ -30,10 +30,14 @@ export async function ensureSchema() {
     )
   `;
 
-  // Migración suave si la tabla ya existía sin is_vip
+  // Migraciones suaves
   await db`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS is_vip BOOLEAN NOT NULL DEFAULT FALSE
+  `;
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE
   `;
 
   await db`
@@ -105,6 +109,7 @@ export type UserRow = {
   password_hash: string;
   role: string;
   is_vip: boolean;
+  banned: boolean;
   created_at: string;
 };
 
@@ -113,6 +118,7 @@ export type PublicUser = {
   username: string;
   role: string;
   is_vip: boolean;
+  banned: boolean;
   created_at: string;
 };
 

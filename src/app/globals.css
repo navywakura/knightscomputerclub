@@ -1228,3 +1228,105 @@ textarea {
   background: var(--green);
   color: #000;
 }
+
+/* ——— mod / admin ——— */
+.mod-btn {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  background: #0a100c;
+  color: var(--text-dim);
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+.mod-btn:hover:not(:disabled) {
+  color: var(--green);
+  border-color: var(--border-bright);
+}
+
+.mod-btn.danger {
+  color: #ff8899;
+  border-color: rgba(255, 80, 100, 0.45);
+}
+
+.mod-btn.danger:hover:not(:disabled) {
+  background: rgba(255, 40, 60, 0.15);
+  color: #ffaabb;
+}
+
+.mod-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.btn.danger {
+  border-color: rgba(255, 80, 100, 0.55);
+  color: #ff8899;
+}
+
+.btn.danger:hover {
+  background: #ff4466;
+  color: #1a0004;
+}
+
+.admin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.admin-section h2 {
+  margin-bottom: 6px;
+}
+
+.admin-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.admin-inline-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.admin-inline-form input {
+  min-width: 120px;
+  font-family: var(--font-mono, monospace);
+  background: #040a05;
+  border: 1px solid var(--border);
+  color: var(--green);
+  padding: 6px 8px;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+  margin: 10px 0;
+}
+
+.admin-table .admin-actions {
+  white-space: nowrap;
+}
+
+.admin-table .admin-actions .mod-btn {
+  margin: 2px;
+}
+
+.admin-row-banned td {
+  opacity: 0.65;
+  text-decoration: line-through;
+}
+
+.admin-row-banned td.admin-actions {
+  text-decoration: none;
+  opacity: 1;
+}

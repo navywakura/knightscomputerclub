@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import RankBadge from "@/components/RankBadge";
-import { getRank, rankNameClass } from "@/lib/ranks";
+import { getRank, isOwnerUser, rankNameClass } from "@/lib/ranks";
 
 type User = {
   id: number;
@@ -122,6 +122,17 @@ export default function Header() {
               className={path.startsWith("/forum/new") ? "active" : ""}
             >
               new_thread
+            </Link>
+          </>
+        )}
+        {user && isOwnerUser(user) && (
+          <>
+            <span className="sep">|</span>
+            <Link
+              href="/admin"
+              className={path.startsWith("/admin") ? "active" : ""}
+            >
+              admin
             </Link>
           </>
         )}

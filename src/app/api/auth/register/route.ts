@@ -56,7 +56,7 @@ export async function POST(req: Request) {
     const rows = await db`
       INSERT INTO users (username, email, password_hash, role)
       VALUES (${username}, ${email}, ${password_hash}, ${role})
-      RETURNING id, username, email, password_hash, role, is_vip, created_at
+      RETURNING id, username, email, password_hash, role, is_vip, banned, created_at
     `;
     const user = toPublicUser(rows[0] as UserRow);
     const token = await createSessionToken(user);

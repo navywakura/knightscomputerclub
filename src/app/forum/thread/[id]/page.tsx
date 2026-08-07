@@ -4,10 +4,15 @@ import { notFound } from "next/navigation";
 import Panel from "@/components/Panel";
 import ReplyForm from "@/components/ReplyForm";
 import RankBadge from "@/components/RankBadge";
+import {
+  DeletePostButton,
+  DeleteThreadButton,
+} from "@/components/ModControls";
 import { getSessionUser } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
 import {
   getRank,
+  isOwnerUser,
   rankNameClass,
   rankPostClass,
   rankUserClass,
@@ -175,6 +180,13 @@ export default async function ThreadPage({ params }: Props) {
     is_vip: Boolean(thread.author_is_vip),
   });
 
+  const isOwner = user ? isOwnerUser(user) : false;
+  const isThreadAuthor = user
+    ? Number(thread.author_id) === user.id
+    : false;
+  const canDeleteThread = isOwner || isThreadAuthor;
+  const categorySlug = String(thread.category_slug || "");
+
   return (
     <>
       <div className="breadcrumbs">
@@ -185,7 +197,17 @@ export default async function ThreadPage({ params }: Props) {
         / #{threadId}
       </div>
 
-      <Panel title={`~/thread/${threadId}`}>
+      <Panel
+        title={`~/thread/${threadId}`}
+        right={
+          canDeleteThread ? (
+            <DeleteThreadButton
+              threadId={threadId}
+              categorySlug={categorySlug}
+            />
+          ) : undefined
+        }
+      >
         <h1>{String(thread.title)}</h1>
         <p className="muted">
           by{" "}
@@ -211,6 +233,8 @@ export default async function ThreadPage({ params }: Props) {
         });
         const userCls = rankUserClass(rank);
         const postCls = rankPostClass(rank);
+        const canDeletePost =
+          isOwner || (user ? Number(p.author_id) === user.id : false);
         return (
           <article
             key={p.id as number}
@@ -231,6 +255,12 @@ export default async function ThreadPage({ params }: Props) {
               </span>
               <span className="role">{String(p.author_role)}</span>
               <span>{new Date(String(p.created_at)).toLocaleString()}</span>
+              {canDeletePost ? (
+                <DeletePostButton
+                  postId={p.id as number}
+                  categorySlug={categorySlug}
+                />
+              ) : null}
             </div>
             <div className="post-body">{String(p.body)}</div>
           </article>

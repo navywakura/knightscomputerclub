@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     const db = getDb();
 
     const rows = await db`
-      SELECT id, username, email, password_hash, role, is_vip, created_at
+      SELECT id, username, email, password_hash, role, is_vip, banned, created_at
       FROM users
       WHERE username = ${login} OR email = ${login}
       LIMIT 1
@@ -44,6 +44,13 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: "credenciales inválidas" },
         { status: 401 }
+      );
+    }
+
+    if (row.banned) {
+      return NextResponse.json(
+        { error: "cuenta baneada — contacto ops del nodo" },
+        { status: 403 }
       );
     }
 

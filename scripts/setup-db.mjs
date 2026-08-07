@@ -57,6 +57,10 @@ async function main() {
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS is_vip BOOLEAN NOT NULL DEFAULT FALSE
   `;
+  await sql`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE
+  `;
 
   await sql`
     CREATE TABLE IF NOT EXISTS categories (

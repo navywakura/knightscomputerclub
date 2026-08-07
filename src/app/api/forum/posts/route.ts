@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
+import { isOwnerUser } from "@/lib/ranks";
 
 export async function GET(req: Request) {
   try {
@@ -106,5 +107,68 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error("[posts POST]", e);
     return NextResponse.json({ error: "error al publicar" }, { status: 500 });
+  }
+}
+
+/** Borrar post: owner o autor del post */
+export async function DELETE(req: Request) {
+  try {
+    const user = await getSessionUser();
+    if (!user) {
+      return NextResponse.json({ error: "login requerido" }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { searchParams } = new URL(req.url);
+    const postId = Number(body.id || body.post_id || searchParams.get("id"));
+    if (!postId) {
+      return NextResponse.json({ error: "id de post requerido" }, { status: 400 });
+    }
+
+    await ensureSchema();
+    const db = getDb();
+
+    const rows = await db`
+      SELECT id, thread_id, author_id FROM posts WHERE id = ${postId} LIMIT 1
+    `;
+    if (!rows[0]) {
+      return NextResponse.json({ error: "post no encontrado" }, { status: 404 });
+    }
+
+    const post = rows[0] as {
+      id: number;
+      thread_id: number;
+      author_id: number;
+    };
+    const owner = isOwnerUser(user);
+    if (!owner && post.author_id !== user.id) {
+      return NextResponse.json({ error: "sin permiso" }, { status: 403 });
+    }
+
+    await db`DELETE FROM posts WHERE id = ${postId}`;
+
+    // Si el hilo quedó vacío, borrar el hilo
+    const left = await db`
+      SELECT COUNT(*)::int AS n FROM posts WHERE thread_id = ${post.thread_id}
+    `;
+    let threadDeleted = false;
+    if ((left[0]?.n as number) === 0) {
+      await db`DELETE FROM threads WHERE id = ${post.thread_id}`;
+      threadDeleted = true;
+    } else {
+      await db`
+        UPDATE threads SET updated_at = NOW() WHERE id = ${post.thread_id}
+      `;
+    }
+
+    return NextResponse.json({
+      ok: true,
+      deleted_post_id: postId,
+      thread_id: post.thread_id,
+      thread_deleted: threadDeleted,
+    });
+  } catch (e) {
+    console.error("[posts DELETE]", e);
+    return NextResponse.json({ error: "error al borrar post" }, { status: 500 });
   }
 }

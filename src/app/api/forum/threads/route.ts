@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
+import { isOwnerUser } from "@/lib/ranks";
 
 export async function GET(req: Request) {
   try {
@@ -107,5 +108,56 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error("[threads POST]", e);
     return NextResponse.json({ error: "error al crear hilo" }, { status: 500 });
+  }
+}
+
+/** Borrar hilo completo (cascade posts). Owner o autor del hilo. */
+export async function DELETE(req: Request) {
+  try {
+    const user = await getSessionUser();
+    if (!user) {
+      return NextResponse.json({ error: "login requerido" }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { searchParams } = new URL(req.url);
+    const threadId = Number(
+      body.id || body.thread_id || searchParams.get("id")
+    );
+    if (!threadId) {
+      return NextResponse.json({ error: "id de hilo requerido" }, { status: 400 });
+    }
+
+    await ensureSchema();
+    const db = getDb();
+
+    const rows = await db`
+      SELECT id, author_id, title FROM threads WHERE id = ${threadId} LIMIT 1
+    `;
+    if (!rows[0]) {
+      return NextResponse.json({ error: "hilo no encontrado" }, { status: 404 });
+    }
+
+    const thread = rows[0] as {
+      id: number;
+      author_id: number;
+      title: string;
+    };
+    const owner = isOwnerUser(user);
+    if (!owner && thread.author_id !== user.id) {
+      return NextResponse.json({ error: "sin permiso" }, { status: 403 });
+    }
+
+    // posts se borran por ON DELETE CASCADE
+    await db`DELETE FROM threads WHERE id = ${threadId}`;
+
+    return NextResponse.json({
+      ok: true,
+      deleted_thread_id: threadId,
+      title: thread.title,
+    });
+  } catch (e) {
+    console.error("[threads DELETE]", e);
+    return NextResponse.json({ error: "error al borrar hilo" }, { status: 500 });
   }
 }

@@ -63,18 +63,31 @@ export async function getSessionUser(): Promise<PublicUser | null> {
 
     const db = getDb();
     const rows = await db`
-      SELECT id, username, role, is_vip, created_at
+      SELECT id, username, role, is_vip, banned, created_at
       FROM users
       WHERE id = ${id}
       LIMIT 1
     `;
     if (!rows[0]) return null;
-    const u = rows[0] as PublicUser;
+    const u = rows[0] as {
+      id: number;
+      username: string;
+      role: string;
+      is_vip: boolean;
+      banned: boolean;
+      created_at: string;
+    };
+    // ban → sesión inválida (no puede actuar)
+    if (u.banned) {
+      await clearSessionCookie().catch(() => {});
+      return null;
+    }
     return {
       id: u.id,
       username: u.username,
       role: u.role,
       is_vip: Boolean(u.is_vip),
+      banned: Boolean(u.banned),
       created_at: String(u.created_at),
     };
   } catch {
@@ -88,6 +101,7 @@ export function toPublicUser(row: UserRow): PublicUser {
     username: row.username,
     role: row.role,
     is_vip: Boolean(row.is_vip),
+    banned: Boolean(row.banned),
     created_at: String(row.created_at),
   };
 }
