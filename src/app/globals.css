@@ -3218,17 +3218,79 @@ button.linkish:hover {
     display: flex;
   }
 
-  .forum-app-grid {
-    grid-template-columns: 1fr;
+  /*
+   * Una sola columna a pantalla completa.
+   * Importante: .split-read en desktop usa 3 cols y es MÁS específico;
+   * hay que anularlo o posts queda en un tercio del ancho.
+   */
+  .forum-app-grid,
+  .forum-app-grid.split-read {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+    width: 100%;
   }
 
   .forum-pane {
-    display: none;
+    display: none !important;
     border-right: none;
   }
 
   .forum-pane.show-mobile {
-    display: flex;
+    display: flex !important;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  /* posts del hilo: cabecera + body scroll a full height */
+  .forum-detail.show-mobile {
+    flex: 1 1 auto;
+  }
+
+  .forum-detail.show-mobile .forum-pane-head {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    align-items: flex-start;
+    padding: 8px 10px;
+  }
+
+  .forum-detail.show-mobile .forum-detail-title {
+    max-width: 100%;
+    flex: 1 1 100%;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    line-height: 1.3;
+    font-size: 0.88rem;
+  }
+
+  .forum-detail.show-mobile .forum-detail-tools {
+    flex: 1 1 auto;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .forum-detail.show-mobile .forum-detail-body,
+  .forum-pane.show-mobile .forum-pane-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .forum-detail.show-mobile .forum-posts {
+    min-height: 0;
+  }
+
+  .forum-detail-body .post {
+    padding-left: 10px;
+    padding-right: 10px;
   }
 
   .forum-app-top {
@@ -3251,9 +3313,19 @@ button.linkish:hover {
     gap: 4px;
   }
 
+  .forum-mini-btn {
+    min-height: 36px;
+    padding: 4px 10px;
+  }
+
   .forum-compose,
   .forum-reply {
     padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  /* en lectura de hilo: menos chrome de foro-app-top si estorba */
+  .forum-app.is-reading .forum-app-top {
+    padding: 4px 8px;
   }
 }
 
