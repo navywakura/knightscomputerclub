@@ -9,6 +9,7 @@ type AdminUser = {
   role: string;
   is_vip: boolean;
   banned: boolean;
+  email_verified: boolean;
   created_at: string;
 };
 
@@ -291,8 +292,8 @@ export default function AdminPanel() {
       <section className="admin-section">
         <h2>usuarios</h2>
         <p className="muted">
-          ban = no login / sin sesión · vip = badge [VIP] · no se puede banear
-          owner
+          ban = no login · vip = badge [VIP] · verificar mail = marca el correo
+          sin OTP (útil si el mail no llega). No se puede banear al owner.
         </p>
         {users.length === 0 ? (
           <p className="muted">sin usuarios</p>
@@ -312,6 +313,7 @@ export default function AdminPanel() {
               <tbody>
                 {users.map((u) => {
                   const busy = busyId === u.id;
+                  const verified = Boolean(u.email_verified);
                   return (
                     <tr
                       key={u.id}
@@ -321,6 +323,18 @@ export default function AdminPanel() {
                       <td>@{u.username}</td>
                       <td className="muted" style={{ fontSize: "0.8rem" }}>
                         {u.email}
+                        <div style={{ marginTop: 2 }}>
+                          {verified ? (
+                            <span className="tag ok">mail ok</span>
+                          ) : (
+                            <span
+                              className="tag hot"
+                              title="correo sin verificar"
+                            >
+                              mail ?
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td>{u.role}</td>
                       <td>
@@ -372,6 +386,43 @@ export default function AdminPanel() {
                             onClick={() => act(u, "vip")}
                           >
                             +vip
+                          </button>
+                        )}
+                        {verified ? (
+                          <button
+                            type="button"
+                            className="mod-btn"
+                            disabled={busy}
+                            title="quitar verificación de email"
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  `¿Quitar verificación de mail a @${u.username}?`
+                                )
+                              ) {
+                                void act(u, "unverify_email");
+                              }
+                            }}
+                          >
+                            −mail
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="mod-btn"
+                            disabled={busy}
+                            title="marcar email como verificado"
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  `¿Verificar el correo de @${u.username} (${u.email})?`
+                                )
+                              ) {
+                                void act(u, "verify_email");
+                              }
+                            }}
+                          >
+                            ✓ mail
                           </button>
                         )}
                       </td>

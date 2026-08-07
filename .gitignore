@@ -56,3 +56,5 @@ fondo_*.jpg
 electron/dist/
 electron/node_modules/
 tree.ml
+packages/kcc-cli/*.tgz
+.release-notes-*.md

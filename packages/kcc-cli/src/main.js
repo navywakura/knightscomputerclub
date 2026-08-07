@@ -114,10 +114,18 @@ ${c.dim("one-shot:")}
 
     case "version":
     case "-v":
-    case "--version":
-      console.log("kcc-cli 0.1.0");
+    case "--version": {
+      let ver = "0.0.0";
+      try {
+        // eslint-disable-next-line import/no-dynamic-require, global-require
+        ver = require("../package.json").version;
+      } catch {
+        /* */
+      }
+      console.log(`kcc-cli ${ver}`);
       console.log(banner());
       break;
+    }
 
     default:
       console.error(`comando desconocido: ${cmd}`);

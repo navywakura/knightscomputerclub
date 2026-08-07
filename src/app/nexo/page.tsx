@@ -31,6 +31,9 @@ export default async function NexoPage({ searchParams }: Props) {
   const boardRaw = (sp.board || "").trim();
   const boardId =
     boardRaw && /^\d+$/.test(boardRaw) ? Number(boardRaw) : null;
+  // también acepta slug: /nexo?board=mi-canal
+  const boardSlug =
+    boardRaw && !boardId ? boardRaw.slice(0, 64).toLowerCase() : null;
   const dmUser = (sp.dm_user || "").trim().replace(/^@/, "") || null;
 
   const user = await getSessionUser().catch(() => null);
@@ -39,6 +42,7 @@ export default async function NexoPage({ searchParams }: Props) {
     if (join) next = nexoInvitePath(join);
     else if (dmId) next = `/nexo?dm=${dmId}`;
     else if (boardId) next = `/nexo?board=${boardId}`;
+    else if (boardSlug) next = `/nexo?board=${encodeURIComponent(boardSlug)}`;
     else if (dmUser) next = `/nexo?dm_user=${encodeURIComponent(dmUser)}`;
     redirect(`/auth/login?next=${encodeURIComponent(next)}`);
   }
@@ -48,6 +52,7 @@ export default async function NexoPage({ searchParams }: Props) {
       initialJoinSlug={join || null}
       initialDmId={dmId}
       initialBoardId={boardId}
+      initialBoardSlug={boardSlug}
       initialDmUser={dmUser}
     />
   );

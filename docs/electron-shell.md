@@ -16,20 +16,21 @@ Cualquier deploy a Vercel se ve en Electron **sin reinstalar**.
 `electron-updater` comprueba **GitHub Releases** del repo
 `navywakura/knightscomputerclub` al arrancar y cada 6 h.
 
-Para publicar un update del `.exe`:
+Para publicar un update del `.exe` **y** alinear la web + CLI:
+
+```bash
+# desde la raíz del monorepo (recomendado)
+npm run release              # 1.2.0 → 1.3.0 + GitHub + versions.json
+# ver docs/release.md
+```
+
+Manual (solo Electron):
 
 ```bash
 cd electron
-npm version patch   # o editar version en package.json
+npm version 1.3.0 --no-git-tag-version
 npm run dist:win
-# subir el release + latest.yml a GitHub Releases (tag vX.Y.Z)
-```
-
-Con token `GH_TOKEN` / `GH_TOKEN` de GitHub, `electron-builder` puede
-publicar solo:
-
-```bash
-GH_TOKEN=… npx electron-builder --win --publish always
+# subir dist/* + latest.yml al tag v1.3.0
 ```
 
 ## Build local

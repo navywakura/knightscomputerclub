@@ -1,6 +1,8 @@
 import { neon, NeonQueryFunction } from "@neondatabase/serverless";
+import { syncAllNexoBoardsToForum } from "@/lib/nexo-forum";
 
 let sql: NeonQueryFunction<false, false> | null = null;
+let nexoSql: NeonQueryFunction<false, false> | null = null;
 
 export function getDb() {
   const url = process.env.DATABASE_URL;
@@ -13,6 +15,26 @@ export function getDb() {
     sql = neon(url);
   }
   return sql;
+}
+
+/**
+ * DB de chat nexo. Si ponés NEXO_DATABASE_URL (otra Neon/Postgres),
+ * los mensajes viven aparte del foro y no se pisan con el tráfico de posts.
+ * Si no, usa la misma DATABASE_URL de siempre.
+ */
+export function getNexoDb() {
+  const nexoUrl = process.env.NEXO_DATABASE_URL?.trim();
+  if (!nexoUrl) return getDb();
+  if (!nexoSql) {
+    nexoSql = neon(nexoUrl);
+  }
+  return nexoSql;
+}
+
+export function isNexoDbSplit(): boolean {
+  const a = process.env.DATABASE_URL?.trim();
+  const b = process.env.NEXO_DATABASE_URL?.trim();
+  return Boolean(b && a && b !== a);
 }
 
 export async function ensureSchema() {
@@ -413,7 +435,24 @@ export async function ensureSchema() {
       ON reports (target_type, target_id)
   `;
 
-  // Pastebin ZK — solo ciphertext; la key nunca llega al server
+  // códigos para que el CLI se loguee desde la web (tipo device flow, sin drama)
+  await db`
+    CREATE TABLE IF NOT EXISTS cli_device_codes (
+      device_code VARCHAR(64) PRIMARY KEY,
+      user_code VARCHAR(16) NOT NULL UNIQUE,
+      user_id INT REFERENCES users(id) ON DELETE CASCADE,
+      session_token TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL,
+      approved_at TIMESTAMPTZ
+    )
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_cli_device_user_code
+      ON cli_device_codes (user_code)
+  `;
+
+  // Pastebin ZK — ciphertext nomás; la llave se queda en el # de la URL
   await db`
     CREATE TABLE IF NOT EXISTS pastes (
       id VARCHAR(32) PRIMARY KEY,
@@ -433,6 +472,13 @@ export async function ensureSchema() {
 
   // Seed / upsert categorías (incluye jerarquía offtopic + nexo)
   await seedCategories(db);
+
+  // Boards viejos de nexo → también en el foro bajo // nexo
+  try {
+    await syncAllNexoBoardsToForum(db);
+  } catch (e) {
+    console.error("[ensureSchema] sync nexo→forum", e);
+  }
 
   // purga pastes vencidos
   try {
@@ -515,6 +561,14 @@ const CATEGORY_SEED: Array<{
     parent_slug: null,
   },
   {
+    slug: "news",
+    name: "// news",
+    description:
+      "Noticias tech, mundo y del club. Fuentes > titulares de WhatsApp.",
+    sort_order: 45,
+    parent_slug: null,
+  },
+  {
     slug: "offtopic",
     name: "// offtopic",
     description:
@@ -547,16 +601,160 @@ const CATEGORY_SEED: Array<{
   {
     slug: "ciencia",
     name: "// ciencia",
-    description: "Ciencia, investigación, divulgación y tech hard.",
+    description:
+      "Hub de ciencia: física, bio, espacio, mate. Sin charlatanería de feria.",
     sort_order: 54,
     parent_slug: "offtopic",
+  },
+  {
+    slug: "fisica",
+    name: "// fisica",
+    description: "Física, astrofísica, experimentos caseros (sin quemar el departamento).",
+    sort_order: 55,
+    parent_slug: "ciencia",
+  },
+  {
+    slug: "biologia",
+    name: "// biologia",
+    description: "Bio, genética, ecología. Nada de curas milagrosas de Instagram.",
+    sort_order: 56,
+    parent_slug: "ciencia",
+  },
+  {
+    slug: "espacio",
+    name: "// espacio",
+    description: "Astronomía, cohetes, telescopios y el vacío que nos mira de vuelta.",
+    sort_order: 57,
+    parent_slug: "ciencia",
+  },
+  {
+    slug: "matematicas",
+    name: "// matematicas",
+    description: "Mate pura y aplicada. Demostraciones, puzzles, código numérico.",
+    sort_order: 58,
+    parent_slug: "ciencia",
+  },
+  {
+    slug: "quimica",
+    name: "// quimica",
+    description: "Química de a pie y de lab. No hagan explosivos en casa, che.",
+    sort_order: 59,
+    parent_slug: "ciencia",
+  },
+  // ── misterio / rarezas / fe (con escepticismo a mano) ──
+  {
+    slug: "misterio",
+    name: "// misterio",
+    description:
+      "Esoterismo, OVNIs, religión, awakening y lo raro. Debate sí; abuso no.",
+    sort_order: 70,
+    parent_slug: null,
+  },
+  {
+    slug: "esoterismo",
+    name: "// esoterismo",
+    description:
+      "Simbolismo, tradiciones, tarot como lenguaje. No reemplaza al psicólogo.",
+    sort_order: 71,
+    parent_slug: "misterio",
+  },
+  {
+    slug: "ufologia",
+    name: "// ufologia",
+    description: "OVNIs, reportes, aviación y el cielo que no cierra la boca.",
+    sort_order: 72,
+    parent_slug: "misterio",
+  },
+  {
+    slug: "aliens",
+    name: "// aliens",
+    description:
+      "Extraterrestres, hipótesis y memes del vecino de Proxima Centauri.",
+    sort_order: 73,
+    parent_slug: "misterio",
+  },
+  {
+    slug: "paranormal",
+    name: "// paranormal",
+    description:
+      "Historias raras, folklore y esa sensación de que alguien te mira el mate.",
+    sort_order: 74,
+    parent_slug: "misterio",
+  },
+  {
+    slug: "awakening",
+    name: "// awakening",
+    description:
+      "Despertar, mindfulness, crisis existenciales a las 3am. Sin guru de MLM.",
+    sort_order: 75,
+    parent_slug: "misterio",
+  },
+  {
+    slug: "religion",
+    name: "// religion",
+    description:
+      "Fe, teología comparada, ritos y dudas. Respeto entre credos; proselitismo agresivo out.",
+    sort_order: 76,
+    parent_slug: "misterio",
+  },
+  {
+    slug: "espiritualidad",
+    name: "// espiritualidad",
+    description:
+      "Práctica personal, meditación, sincretismo. Sin venta de cursos milagro.",
+    sort_order: 77,
+    parent_slug: "misterio",
+  },
+  {
+    slug: "conspiracion",
+    name: "// conspiracion",
+    description: "Teorías y contra-teorías. Traé fuentes o te miramos feo.",
+    sort_order: 78,
+    parent_slug: "misterio",
+  },
+  {
+    slug: "folklore",
+    name: "// folklore",
+    description:
+      "Mitos latinoamericanos, leyendas urbanas y el duende del barrio.",
+    sort_order: 79,
+    parent_slug: "misterio",
+  },
+  // ── hobby / casa ──
+  {
+    slug: "hobby",
+    name: "// hobby",
+    description: "Dibujos, cocina, música y oficios de domingo.",
+    sort_order: 80,
+    parent_slug: null,
+  },
+  {
+    slug: "dibujos",
+    name: "// dibujos",
+    description: "Arte, sketch, digital y el clásico garabato en el cuaderno del colegio.",
+    sort_order: 81,
+    parent_slug: "hobby",
+  },
+  {
+    slug: "cocina",
+    name: "// cocina",
+    description: "Recetas, pan casero, ají de gallina y debates de si el arroz lleva aceite.",
+    sort_order: 82,
+    parent_slug: "hobby",
+  },
+  {
+    slug: "musica",
+    name: "// musica",
+    description: "Playlists, producción, géneros y discos que te salvaron el año.",
+    sort_order: 83,
+    parent_slug: "hobby",
   },
   {
     slug: "nexo",
     name: "// nexo",
     description:
-      "Hub de tablones de usuario (crear board = VIP). Chat casi real-time + DMs con PIN.",
-    sort_order: 60,
+      "Hub de tablones de chat. Creás un board en /nexo (VIP) y aparece acá automáticamente. Chat en vivo + hilos del foro.",
+    sort_order: 90,
     parent_slug: null,
   },
 ];

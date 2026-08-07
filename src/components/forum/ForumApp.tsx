@@ -773,6 +773,29 @@ export default function ForumApp({
               <p className="forum-board-desc muted">{activeBoard.description}</p>
             )}
 
+            {/* // nexo: chat + foro van juntos */}
+            {activeBoard &&
+              (activeBoard.slug === "nexo" ||
+                activeBoard.parent_slug === "nexo") && (
+                <p className="forum-nexo-bridge">
+                  {activeBoard.slug === "nexo" ? (
+                    <>
+                      los subboards de acá son tablones de chat. creá uno en{" "}
+                      <Link href="/nexo">/nexo</Link> (VIP) y aparece solo.
+                    </>
+                  ) : (
+                    <>
+                      chat en vivo de este board:{" "}
+                      <Link
+                        href={`/nexo?board=${encodeURIComponent(activeBoard.slug)}`}
+                      >
+                        abrir en // nexo →
+                      </Link>
+                    </>
+                  )}
+                </p>
+              )}
+
             {mode === "board" && isHub && (
               <div className="forum-hub-grid">
                 {hubChildren.map((ch) => (
@@ -785,8 +808,17 @@ export default function ForumApp({
                     <strong>{ch.name}</strong>
                     <span className="muted">{ch.description}</span>
                     <span className="tag">{ch.thread_count} threads</span>
+                    {activeBoard?.slug === "nexo" && (
+                      <span className="tag forum-nexo-tag">chat</span>
+                    )}
                   </button>
                 ))}
+                {activeBoard?.slug === "nexo" && hubChildren.length === 0 && (
+                  <p className="muted forum-pad">
+                    todavía no hay tablones. un VIP puede crear el primero en{" "}
+                    <Link href="/nexo">/nexo</Link>.
+                  </p>
+                )}
               </div>
             )}
 

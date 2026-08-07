@@ -17,7 +17,8 @@ export async function GET() {
     const db = getDb();
     const users = await db`
       SELECT
-        id, username, email, role, is_vip, banned, created_at
+        id, username, email, role, is_vip, banned,
+        email_verified, created_at
       FROM users
       ORDER BY created_at DESC
       LIMIT 200
@@ -31,6 +32,7 @@ export async function GET() {
         role: u.role,
         is_vip: Boolean(u.is_vip),
         banned: Boolean(u.banned),
+        email_verified: Boolean(u.email_verified),
         created_at: u.created_at,
       })),
     });
@@ -42,7 +44,7 @@ export async function GET() {
 
 /**
  * Acciones admin sobre un usuario.
- * Body: { username | id, action: "ban"|"unban"|"vip"|"unvip" }
+ * Body: { username | id, action: ban|unban|vip|unvip|verify_email|unverify_email }
  */
 export async function POST(req: Request) {
   try {
@@ -58,9 +60,20 @@ export async function POST(req: Request) {
       ? sanitizeUsername(String(body.username))
       : "";
 
-    if (!["ban", "unban", "vip", "unvip"].includes(action)) {
+    const allowed = [
+      "ban",
+      "unban",
+      "vip",
+      "unvip",
+      "verify_email",
+      "unverify_email",
+    ];
+    if (!allowed.includes(action)) {
       return NextResponse.json(
-        { error: "action: ban | unban | vip | unvip" },
+        {
+          error:
+            "action: ban | unban | vip | unvip | verify_email | unverify_email",
+        },
         { status: 400 }
       );
     }
@@ -76,11 +89,13 @@ export async function POST(req: Request) {
 
     const targets = id
       ? await db`
-          SELECT id, username, email, role, is_vip, banned, created_at
+          SELECT id, username, email, role, is_vip, banned,
+                 email_verified, created_at
           FROM users WHERE id = ${id} LIMIT 1
         `
       : await db`
-          SELECT id, username, email, role, is_vip, banned, created_at
+          SELECT id, username, email, role, is_vip, banned,
+                 email_verified, created_at
           FROM users WHERE username = ${username} LIMIT 1
         `;
 
@@ -98,6 +113,7 @@ export async function POST(req: Request) {
       role: string;
       is_vip: boolean;
       banned: boolean;
+      email_verified: boolean;
     };
 
     // No banear / tocar al owner del nodo
@@ -122,25 +138,49 @@ export async function POST(req: Request) {
       rows = await db`
         UPDATE users SET banned = TRUE
         WHERE id = ${target.id}
-        RETURNING id, username, email, role, is_vip, banned, created_at
+        RETURNING id, username, email, role, is_vip, banned,
+                  email_verified, created_at
       `;
     } else if (action === "unban") {
       rows = await db`
         UPDATE users SET banned = FALSE
         WHERE id = ${target.id}
-        RETURNING id, username, email, role, is_vip, banned, created_at
+        RETURNING id, username, email, role, is_vip, banned,
+                  email_verified, created_at
       `;
     } else if (action === "vip") {
       rows = await db`
         UPDATE users SET is_vip = TRUE
         WHERE id = ${target.id}
-        RETURNING id, username, email, role, is_vip, banned, created_at
+        RETURNING id, username, email, role, is_vip, banned,
+                  email_verified, created_at
       `;
-    } else {
+    } else if (action === "unvip") {
       rows = await db`
         UPDATE users SET is_vip = FALSE
         WHERE id = ${target.id}
-        RETURNING id, username, email, role, is_vip, banned, created_at
+        RETURNING id, username, email, role, is_vip, banned,
+                  email_verified, created_at
+      `;
+    } else if (action === "verify_email") {
+      // Owner marca el mail como verificado a mano (sin OTP)
+      rows = await db`
+        UPDATE users
+        SET email_verified = TRUE,
+            email_otp_hash = NULL,
+            email_otp_expires = NULL
+        WHERE id = ${target.id}
+        RETURNING id, username, email, role, is_vip, banned,
+                  email_verified, created_at
+      `;
+    } else {
+      // unverify_email
+      rows = await db`
+        UPDATE users
+        SET email_verified = FALSE
+        WHERE id = ${target.id}
+        RETURNING id, username, email, role, is_vip, banned,
+                  email_verified, created_at
       `;
     }
 
@@ -190,6 +230,17 @@ export async function POST(req: Request) {
         actorLabel: owner.username,
         payload: { banned: false },
       });
+    } else if (action === "verify_email") {
+      await safeNotify({
+        userId: Number(u.id),
+        type: "auth.email",
+        title: "email verificado",
+        body: "Un admin marcó tu correo como verificado. Ya podés usar el nodo al completo.",
+        href: "/settings",
+        actorId: owner.id,
+        actorLabel: owner.username,
+        payload: { email_verified: true },
+      });
     }
 
     return NextResponse.json({
@@ -202,6 +253,7 @@ export async function POST(req: Request) {
         role: u.role,
         is_vip: Boolean(u.is_vip),
         banned: Boolean(u.banned),
+        email_verified: Boolean(u.email_verified),
         created_at: u.created_at,
       },
     });

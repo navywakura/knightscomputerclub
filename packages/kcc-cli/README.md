@@ -11,16 +11,36 @@ Solo habla con el hub de tablones Nexo. **Avatar y banner de perfil se configura
 
 ## Install
 
+### Desde GitHub Release (recomendado)
+
 ```bash
-# desde el monorepo
+# VER = misma que en https://github.com/navywakura/knightscomputerclub/releases
+VER=1.2.0
+curl -fsSL -o kcc-cli-$VER.tgz \
+  "https://github.com/navywakura/knightscomputerclub/releases/download/v$VER/kcc-cli-$VER.tgz"
+npm i -g ./kcc-cli-$VER.tgz
+kcc --version
+```
+
+También en la web: [/descargar](https://www.knightscomputer.club/descargar).
+
+### Desde el monorepo
+
+```bash
 cd packages/kcc-cli
 npm link          # expone el binario `kcc` global
-
 # o sin link
 node bin/kcc.js
 ```
 
-Publicación futura: `npm i -g kcc-cli` (cuando se publique el paquete).
+### Publicar un release (maintainers)
+
+Desde la raíz del repo:
+
+```bash
+npm run release          # minor + build Electron + pack CLI + gh release
+# docs: docs/release.md
+```
 
 ## Uso rápido
 

@@ -86,7 +86,7 @@ export const VIP_PERKS: Array<{ title: string; body: string }> = [
   },
   {
     title: "Crear tablones en // nexo",
-    body: "Solo VIP puede crear boards propios bajo /nexo. El resto puede chatear en los existentes y usar DMs con PIN.",
+    body: "Solo VIP crea tablones en /nexo: salen el chat y el board del foro bajo // nexo al mismo tiempo. El resto chatea y usa DMs con PIN.",
   },
   {
     title: "Apoyo al nodo",

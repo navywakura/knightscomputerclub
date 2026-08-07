@@ -3875,6 +3875,68 @@ body.nexo-app-active footer {
   color: var(--green);
 }
 
+.nexo-modal-create {
+  width: min(460px, 100%);
+}
+
+.nexo-create-hint {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.nexo-create-form label {
+  display: block;
+  margin-top: 10px;
+  margin-bottom: 4px;
+  font-size: 0.8rem;
+  color: var(--green);
+}
+
+.nexo-create-preview {
+  margin: 8px 0 4px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  background: rgba(0, 255, 65, 0.04);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--muted, #8a9a8a);
+}
+
+.nexo-create-preview code {
+  color: var(--green);
+  font-size: 0.85em;
+}
+
+.nexo-create-captcha-label {
+  margin-top: 12px !important;
+}
+
+.nexo-create-steps {
+  margin: 10px 0 14px;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.nexo-create-ok .compose-toolbar {
+  margin-top: 4px;
+}
+
+.forum-nexo-bridge {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--green);
+  background: rgba(0, 255, 65, 0.05);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.forum-nexo-tag {
+  margin-left: 4px;
+  opacity: 0.85;
+}
+
 /* custom context menu (app chrome, not OS) */
 .app-ctx-root {
   display: block;

@@ -109,15 +109,13 @@ curl -fsS https://mirror.example/api/health
   actual** tras deploy web.
 - Shell binario: `electron-updater` + **GitHub Releases**
   (`navywakura/knightscomputerclub`).
-- Publicar:
+- Publicar todo (Electron + CLI + alinear `/descargar`) desde la raíz:
 
 ```bash
-cd electron
-npm version patch
-GH_TOKEN=… npx electron-builder --win --publish always
+npm run release          # ver docs/release.md
+git add versions.json packages/kcc-cli/package.json src/lib/downloads.ts
+git commit -m "chore(release): vX.Y.Z" && git push
 ```
-
-Subir `KCC-Nexo-Setup-*.exe`, `latest.yml` y `.blockmap` al release.
 
 ## Google Auth a producción
 

@@ -8,8 +8,9 @@ import {
   type UserRow,
 } from "./db";
 
-const COOKIE_NAME = "kc_session";
-const MAX_AGE = 60 * 60 * 24 * 14; // 14 days
+export const COOKIE_NAME = "kc_session";
+export const SESSION_MAX_AGE = 60 * 60 * 24 * 14; // dos semanas, como el alquiler del depa
+const MAX_AGE = SESSION_MAX_AGE;
 
 function getSecret() {
   const secret = process.env.JWT_SECRET;

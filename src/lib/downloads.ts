@@ -1,7 +1,9 @@
 /**
  * Canales de descarga de clientes KCC.
- * Windows Electron está listo; el resto se marca como próximamente.
+ * Las versiones viven en /versions.json (las actualiza `npm run release`).
  */
+
+import versions from "../../versions.json";
 
 export type DownloadPlatform = {
   id: string;
@@ -21,14 +23,37 @@ export type DownloadPlatform = {
   logo: "windows" | "macos" | "linux" | "cli" | "android" | "ios";
 };
 
-/** Releases en GitHub (electron-builder publish) */
-const GH_RELEASES =
-  "https://github.com/navywakura/knightscomputerclub/releases";
-const GH_LATEST = `${GH_RELEASES}/latest`;
+const GH_OWNER = versions.github.owner;
+const GH_REPO = versions.github.repo;
+const ELECTRON_VER = versions.electron;
+const CLI_VER = versions.cli;
 
-/** Artefactos nombrados por electron-builder (v1.2.0+) */
-const WIN_SETUP = `${GH_RELEASES}/download/v1.2.0/KCC-Nexo-Setup-1.2.0.exe`;
-const WIN_PORTABLE = `${GH_RELEASES}/download/v1.2.0/KCC-Nexo-Portable-1.2.0.exe`;
+/** Releases en GitHub (electron-builder + scripts/release.mjs) */
+export const GH_RELEASES = `https://github.com/${GH_OWNER}/${GH_REPO}/releases`;
+export const GH_LATEST = `${GH_RELEASES}/latest`;
+export const GH_TAG = `v${ELECTRON_VER}`;
+export const GH_TAG_URL = `${GH_RELEASES}/tag/${GH_TAG}`;
+
+const winSetupName = versions.artifacts.winSetup.replace(
+  "{version}",
+  ELECTRON_VER
+);
+const winPortableName = versions.artifacts.winPortable.replace(
+  "{version}",
+  ELECTRON_VER
+);
+
+const WIN_SETUP = `${GH_RELEASES}/download/${GH_TAG}/${winSetupName}`;
+const WIN_PORTABLE = `${GH_RELEASES}/download/${GH_TAG}/${winPortableName}`;
+const CLI_TGZ = `${GH_RELEASES}/download/${GH_TAG}/kcc-cli-${CLI_VER}.tgz`;
+const CLI_REPO =
+  `https://github.com/${GH_OWNER}/${GH_REPO}/tree/main/packages/kcc-cli`;
+
+export const CLIENT_VERSIONS = {
+  electron: ELECTRON_VER,
+  cli: CLI_VER,
+  tag: GH_TAG,
+} as const;
 
 export const DOWNLOAD_PLATFORMS: DownloadPlatform[] = [
   {
@@ -37,7 +62,7 @@ export const DOWNLOAD_PLATFORMS: DownloadPlatform[] = [
     subtitle: "KCC Nexo · Electron (x64)",
     status: "ready",
     logo: "windows",
-    version: "1.2.0",
+    version: ELECTRON_VER,
     cta: "Descargar instalador (.exe)",
     href: WIN_SETUP,
     alt: [
@@ -69,17 +94,18 @@ export const DOWNLOAD_PLATFORMS: DownloadPlatform[] = [
     subtitle: "Terminal · // nexo only",
     status: "ready",
     logo: "cli",
-    version: "0.1.0",
-    cta: "Ver instalación (npm / monorepo)",
-    href: "https://github.com/navywakura/knightscomputerclub/tree/main/packages/kcc-cli",
+    version: CLI_VER,
+    cta: "Descargar package (.tgz)",
+    href: CLI_TGZ,
     alt: [
+      { label: "Código en el monorepo", href: CLI_REPO },
       {
         label: "README · comandos",
-        href: "https://github.com/navywakura/knightscomputerclub/blob/main/packages/kcc-cli/README.md",
+        href: `https://github.com/${GH_OWNER}/${GH_REPO}/blob/main/packages/kcc-cli/README.md`,
       },
+      { label: "Release tag", href: GH_TAG_URL },
     ],
-    notes:
-      "Shell de terminal para chatear en Nexo y setear avatar/banner desde la CLI. Node ≥18: cd packages/kcc-cli && npm link",
+    notes: `npm i -g kcc-cli-${CLI_VER}.tgz  ·  o desde monorepo: cd packages/kcc-cli && npm link. Node ≥18.`,
   },
   {
     id: "android",

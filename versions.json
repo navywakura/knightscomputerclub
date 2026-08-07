@@ -1,0 +1,13 @@
+{
+  "electron": "1.3.0",
+  "cli": "1.3.0",
+  "github": {
+    "owner": "navywakura",
+    "repo": "knightscomputerclub"
+  },
+  "artifacts": {
+    "winSetup": "KCC-Nexo-Setup-{version}.exe",
+    "winPortable": "KCC-Nexo-Portable-{version}.exe",
+    "latestYml": "latest.yml"
+  }
+}

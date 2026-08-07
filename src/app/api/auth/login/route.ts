@@ -87,8 +87,10 @@ export async function POST(req: Request) {
     const token = await createSessionToken(user);
     await setSessionCookie(token);
 
+    // token también en el body: lo usa kcc-cli y scripts (la cookie sigue siendo la reina en el browser)
     return NextResponse.json({
       user,
+      token,
       restored,
       message: restored
         ? "cuenta restaurada (cancelaste la eliminación de 7 días)"

@@ -7,6 +7,7 @@ import {
   NEXO_BOARD_NAME_MAX,
   slugifyBoardName,
 } from "@/lib/nexo";
+import { mirrorNexoBoardToForum } from "@/lib/nexo-forum";
 import { nexoBoardPostSchema, readJsonBody } from "@/lib/validate";
 
 export async function GET() {
@@ -93,13 +94,16 @@ export async function POST(req: Request) {
     await ensureSchema();
     const db = getDb();
 
-    // unicidad de slug
+    // slug único en chat Y en el foro (mismo path mental)
     for (let i = 0; i < 12; i++) {
       const candidate = i === 0 ? slug : `${slug.slice(0, 40)}-${i + 1}`;
-      const exists = await db`
+      const existsBoard = await db`
         SELECT id FROM nexo_boards WHERE slug = ${candidate} LIMIT 1
       `;
-      if (!exists[0]) {
+      const existsCat = await db`
+        SELECT id FROM categories WHERE slug = ${candidate} LIMIT 1
+      `;
+      if (!existsBoard[0] && !existsCat[0]) {
         slug = candidate;
         break;
       }
@@ -120,6 +124,22 @@ export async function POST(req: Request) {
       ON CONFLICT (board_id, user_id) DO NOTHING
     `;
 
+    // espejo en /forum bajo // nexo (subboard + hilo intro)
+    let forum: Awaited<ReturnType<typeof mirrorNexoBoardToForum>> | null =
+      null;
+    try {
+      forum = await mirrorNexoBoardToForum(db, {
+        boardId,
+        slug,
+        name,
+        description,
+        ownerId: user.id,
+        ownerUsername: user.username,
+      });
+    } catch (e) {
+      console.error("[nexo boards POST] mirror forum", e);
+    }
+
     return NextResponse.json(
       {
         board: {
@@ -129,6 +149,14 @@ export async function POST(req: Request) {
           owner_role: user.role,
           message_count: 0,
         },
+        forum: forum
+          ? {
+              category_id: forum.categoryId,
+              slug: forum.forumSlug,
+              thread_id: forum.threadId,
+              path: forum.forumSlug ? `/forum/${forum.forumSlug}` : null,
+            }
+          : null,
       },
       { status: 201 }
     );

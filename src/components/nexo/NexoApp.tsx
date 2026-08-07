@@ -29,6 +29,7 @@ import {
   NEXO_GROUP_MS,
   NEXO_POLL_HIDDEN_MS,
   NEXO_POLL_MS,
+  slugifyBoardName,
 } from "@/lib/nexo";
 import { parseNexoCommand } from "@/lib/nexo-commands";
 import { apiFetch, getStorage } from "@/lib/platform";
@@ -105,6 +106,8 @@ type Props = {
   initialDmId?: number | null;
   /** abrir board por id (?board=) */
   initialBoardId?: number | null;
+  /** abrir board por slug (?board=mi-canal) */
+  initialBoardSlug?: string | null;
   /** prefill DM open (?dm_user=) */
   initialDmUser?: string | null;
 };
@@ -113,6 +116,7 @@ export default function NexoApp({
   initialJoinSlug = null,
   initialDmId = null,
   initialBoardId = null,
+  initialBoardSlug = null,
   initialDmUser = null,
 }: Props) {
   const [me, setMe] = useState<Me | null>(null);
@@ -138,13 +142,18 @@ export default function NexoApp({
   const serverTimeRef = useRef<string | null>(null);
   const router = useRouter();
 
-  // create board
+  // create board (flujo simple: nombre → listo)
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [boardCaptchaToken, setBoardCaptchaToken] = useState("");
   const [boardCaptchaAnswer, setBoardCaptchaAnswer] = useState("");
   const [boardCaptchaKey, setBoardCaptchaKey] = useState(0);
+  const [createOk, setCreateOk] = useState<{
+    name: string;
+    boardId: number;
+    forumPath: string | null;
+  } | null>(null);
 
   // DM
   const [dmThreads, setDmThreads] = useState<DmThread[]>([]);
@@ -163,6 +172,7 @@ export default function NexoApp({
   const [inviteMissing, setInviteMissing] = useState(false);
   const [copyOk, setCopyOk] = useState("");
   const inviteHandled = useRef(false);
+  const boardDeepLinkHandled = useRef(false);
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const lastIdRef = useRef(0);
@@ -400,10 +410,25 @@ export default function NexoApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, initialDmId]);
 
-  // ?board=id
+  // ?board=id o ?board=slug (una sola vez)
   useEffect(() => {
-    if (loading || !initialBoardId) return;
-    selectBoard(initialBoardId);
+    if (loading || boardDeepLinkHandled.current) return;
+    if (!initialBoardId && !initialBoardSlug) return;
+    if (initialBoardSlug && boards.length === 0) return; // esperar lista
+
+    boardDeepLinkHandled.current = true;
+    if (initialBoardId) {
+      selectBoard(initialBoardId);
+    } else if (initialBoardSlug) {
+      const found = boards.find(
+        (b) => b.slug.toLowerCase() === initialBoardSlug.toLowerCase()
+      );
+      if (found) selectBoard(found.id);
+      else
+        setError(
+          `no se encontró el tablón “${initialBoardSlug}”. ¿existe aún?`
+        );
+    }
     if (typeof window !== "undefined") {
       const u = new URL(window.location.href);
       if (u.searchParams.has("board")) {
@@ -412,7 +437,7 @@ export default function NexoApp({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, initialBoardId]);
+  }, [loading, initialBoardId, initialBoardSlug, boards]);
 
   // ?dm_user= → abrir modal DM
   useEffect(() => {
@@ -530,8 +555,14 @@ export default function NexoApp({
   async function createBoard(e: FormEvent) {
     e.preventDefault();
     setError("");
+    setCreateOk(null);
     if (!vip) {
       setError("crear tablones es exclusivo [VIP]");
+      return;
+    }
+    const name = newName.trim();
+    if (name.length < 2) {
+      setError("poné un nombre (mín. 2 letras)");
       return;
     }
     setSending(true);
@@ -540,8 +571,8 @@ export default function NexoApp({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: newName,
-          description: newDesc,
+          name,
+          description: newDesc.trim(),
           captcha_token: boardCaptchaToken,
           captcha_answer: boardCaptchaAnswer,
         }),
@@ -552,11 +583,18 @@ export default function NexoApp({
         setBoardCaptchaKey((k) => k + 1);
         return;
       }
+      const forumPath =
+        (d.forum?.path as string | null) ||
+        (d.board?.slug ? `/forum/${d.board.slug}` : null);
+      setCreateOk({
+        name: String(d.board?.name || name),
+        boardId: Number(d.board?.id || 0),
+        forumPath,
+      });
       setNewName("");
       setNewDesc("");
       setBoardCaptchaAnswer("");
       setBoardCaptchaKey((k) => k + 1);
-      setShowCreate(false);
       await loadBoards();
       if (d.board?.id) {
         setBoardId(Number(d.board.id));
@@ -1800,23 +1838,86 @@ export default function NexoApp({
         </div>
       )}
 
-      {/* modal crear board — VIP only */}
+      {/* modal crear board — un solo paso, espejo al foro */}
       {showCreate && (
         <div className="nexo-modal-backdrop" role="presentation">
-          <div className="nexo-modal" role="dialog" aria-label="crear tablón">
-            <h2>nuevo tablón // nexo</h2>
-            {!vip ? (
-              <p className="form-error">
-                Solo miembros{" "}
-                <span className="vip-badge" data-text="[VIP]">
-                  [VIP]
-                </span>{" "}
-                pueden crear boards.{" "}
-                <Link href="/donate">donar →</Link>
-              </p>
+          <div
+            className="nexo-modal nexo-modal-create"
+            role="dialog"
+            aria-label="crear tablón"
+          >
+            <h2>crear tablón</h2>
+            {createOk ? (
+              <div className="nexo-create-ok">
+                <p className="form-ok" style={{ margin: 0 }}>
+                  listo — <strong>{createOk.name}</strong> ya está vivo.
+                </p>
+                <ul className="nexo-create-steps muted">
+                  <li>
+                    chat acá en{" "}
+                    <strong>/nexo</strong>
+                    {createOk.boardId ? ` (board #${createOk.boardId})` : ""}
+                  </li>
+                  {createOk.forumPath && (
+                    <li>
+                      y en el foro:{" "}
+                      <Link href={createOk.forumPath}>{createOk.forumPath}</Link>
+                      {" "}(bajo // nexo)
+                    </li>
+                  )}
+                </ul>
+                <div className="compose-toolbar">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      setShowCreate(false);
+                      setCreateOk(null);
+                    }}
+                  >
+                    [ entrar al chat ]
+                  </button>
+                  {createOk.forumPath && (
+                    <Link
+                      href={createOk.forumPath}
+                      className="btn secondary"
+                      onClick={() => {
+                        setShowCreate(false);
+                        setCreateOk(null);
+                      }}
+                    >
+                      ver en foro
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ) : !vip ? (
+              <>
+                <p className="form-error">
+                  Solo{" "}
+                  <span className="vip-badge" data-text="[VIP]">
+                    [VIP]
+                  </span>{" "}
+                  puede crear tablones.{" "}
+                  <Link href="/donate">donar →</Link>
+                </p>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => setShowCreate(false)}
+                >
+                  cerrar
+                </button>
+              </>
             ) : (
-              <form onSubmit={createBoard}>
-                <label htmlFor="nb-name">nombre</label>
+              <form onSubmit={createBoard} className="nexo-create-form">
+                <p className="muted nexo-create-hint">
+                  Un solo nombre y listo. Se crea el <strong>chat</strong> y
+                  también el board en el <strong>foro</strong> bajo{" "}
+                  <Link href="/forum/nexo">// nexo</Link>.
+                </p>
+
+                <label htmlFor="nb-name">1. nombre del tablón</label>
                 <input
                   id="nb-name"
                   value={newName}
@@ -1824,16 +1925,40 @@ export default function NexoApp({
                   required
                   minLength={2}
                   maxLength={64}
-                  placeholder="mi-canal"
+                  placeholder="ej: random, late-night, hardware…"
+                  autoFocus
+                  autoComplete="off"
                 />
-                <label htmlFor="nb-desc">descripción</label>
+
+                {newName.trim().length >= 2 && (
+                  <div className="nexo-create-preview" aria-live="polite">
+                    <div>
+                      chat → <code>/nexo</code>
+                    </div>
+                    <div>
+                      foro →{" "}
+                      <code>
+                        /forum/{slugifyBoardName(newName) || "…"}
+                      </code>
+                    </div>
+                  </div>
+                )}
+
+                <label htmlFor="nb-desc">
+                  2. de qué va{" "}
+                  <span className="muted">(opcional)</span>
+                </label>
                 <input
                   id="nb-desc"
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
                   maxLength={400}
-                  placeholder="de qué va este nexo"
+                  placeholder="una línea alcanza"
                 />
+
+                <label className="nexo-create-captcha-label">
+                  3. captcha anti-bots
+                </label>
                 <CaptchaField
                   disabled={sending}
                   refreshKey={boardCaptchaKey}
@@ -1842,28 +1967,27 @@ export default function NexoApp({
                     setBoardCaptchaAnswer(p.answer);
                   }}
                 />
+
                 <div className="compose-toolbar">
-                  <button className="btn" type="submit" disabled={sending}>
-                    [ create ]
+                  <button
+                    className="btn"
+                    type="submit"
+                    disabled={sending || newName.trim().length < 2}
+                  >
+                    {sending ? "creando…" : "[ crear tablón ]"}
                   </button>
                   <button
                     type="button"
                     className="btn secondary"
-                    onClick={() => setShowCreate(false)}
+                    onClick={() => {
+                      setShowCreate(false);
+                      setCreateOk(null);
+                    }}
                   >
-                    cancel
+                    cancelar
                   </button>
                 </div>
               </form>
-            )}
-            {!vip && (
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={() => setShowCreate(false)}
-              >
-                cerrar
-              </button>
             )}
           </div>
         </div>

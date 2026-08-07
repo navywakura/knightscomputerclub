@@ -1,6 +1,6 @@
 {
   "name": "kcc-cli",
-  "version": "0.1.0",
+  "version": "1.3.0",
   "description": "KCC CLI — shell de terminal para // nexo (knightscomputer.club)",
   "bin": {
     "kcc": "./bin/kcc.js"
