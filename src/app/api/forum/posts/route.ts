@@ -45,6 +45,7 @@ export async function GET(req: Request) {
     const posts = await db`
       SELECT
         p.id, p.thread_id, p.author_id, p.body, p.created_at, p.updated_at,
+        p.pgp_fingerprint, p.pgp_signature,
         u.username AS author_name,
         u.display_name AS author_display_name,
         u.role AS author_role,
@@ -144,10 +145,38 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "hilo bloqueado" }, { status: 403 });
     }
 
+    // PGP: marcar firma si el usuario tiene fingerprint y pidió sign_pgp
+    let pgpFp: string | null = null;
+    let pgpSig: string | null = null;
+    if (body.sign_pgp === true || body.sign_pgp === "1") {
+      const urows = await db`
+        SELECT pgp_fingerprint, pgp_public_key
+        FROM users WHERE id = ${me.id} LIMIT 1
+      `;
+      const fp = urows[0]?.pgp_fingerprint
+        ? String(urows[0].pgp_fingerprint)
+        : "";
+      if (!fp) {
+        return NextResponse.json(
+          {
+            error:
+              "vinculá una fingerprint PGP en /settings antes de firmar posts",
+            code: "pgp_missing",
+          },
+          { status: 400 }
+        );
+      }
+      pgpFp = fp;
+      // firma opcional pegada por el usuario (clearsign / detached)
+      const sig = String(body.pgp_signature || "").trim();
+      if (sig) pgpSig = sig.slice(0, 16000);
+    }
+
     const posts = await db`
-      INSERT INTO posts (thread_id, author_id, body)
-      VALUES (${threadId}, ${me.id}, ${content})
-      RETURNING id, thread_id, author_id, body, created_at, updated_at
+      INSERT INTO posts (thread_id, author_id, body, pgp_fingerprint, pgp_signature)
+      VALUES (${threadId}, ${me.id}, ${content}, ${pgpFp}, ${pgpSig})
+      RETURNING id, thread_id, author_id, body, created_at, updated_at,
+        pgp_fingerprint, pgp_signature
     `;
 
     await db`

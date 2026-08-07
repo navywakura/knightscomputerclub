@@ -18,6 +18,11 @@ export type NotificationCenterProps = {
    * y la pestaña no está visible (navegador + Electron).
    */
   desktopNotify?: boolean;
+  /** Callback al detectar unread nuevos (para sonido en el host). */
+  onNewUnread?: (payload: {
+    unread: number;
+    latest?: NotificationRecord | null;
+  }) => void;
 };
 
 type InboxResponse = {
@@ -37,6 +42,7 @@ export function NotificationCenter({
   className = "",
   onNavigate,
   desktopNotify = false,
+  onNewUnread,
 }: NotificationCenterProps) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationRecord[]>([]);
@@ -45,6 +51,8 @@ export function NotificationCenter({
   const rootRef = useRef<HTMLDivElement>(null);
   const lastUnreadRef = useRef(0);
   const primedRef = useRef(false);
+  const onNewUnreadRef = useRef(onNewUnread);
+  onNewUnreadRef.current = onNewUnread;
 
   const load = useCallback(async () => {
     if (!enabled) return;
@@ -64,16 +72,21 @@ export function NotificationCenter({
       setItems(nextItems);
       setUnread(nextUnread);
 
-      if (desktopNotify && typeof window !== "undefined" && "Notification" in window) {
-        if (!primedRef.current) {
-          primedRef.current = true;
-          lastUnreadRef.current = nextUnread;
-        } else if (
-          nextUnread > lastUnreadRef.current &&
+      if (!primedRef.current) {
+        primedRef.current = true;
+        lastUnreadRef.current = nextUnread;
+      } else if (nextUnread > lastUnreadRef.current) {
+        const fresh =
+          nextItems.find((x) => !x.read_at) || nextItems[0] || null;
+        onNewUnreadRef.current?.({ unread: nextUnread, latest: fresh });
+
+        if (
+          desktopNotify &&
+          typeof window !== "undefined" &&
+          "Notification" in window &&
           document.visibilityState !== "visible" &&
           Notification.permission === "granted"
         ) {
-          const fresh = nextItems.find((x) => !x.read_at) || nextItems[0];
           try {
             const n = new Notification(
               fresh?.title || "Nueva notificación",
@@ -94,6 +107,8 @@ export function NotificationCenter({
             /* */
           }
         }
+        lastUnreadRef.current = nextUnread;
+      } else {
         lastUnreadRef.current = nextUnread;
       }
     } catch {

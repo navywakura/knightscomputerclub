@@ -12,8 +12,21 @@ type AdminUser = {
   created_at: string;
 };
 
+type ReportRow = {
+  id: number;
+  reporter_id: number;
+  reporter_name?: string;
+  target_type: string;
+  target_id: number;
+  reason: string;
+  details: string;
+  status: string;
+  created_at: string;
+};
+
 export default function AdminPanel() {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [reports, setReports] = useState<ReportRow[]>([]);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(true);
@@ -39,9 +52,41 @@ export default function AdminPanel() {
     }
   }, []);
 
+  const loadReports = useCallback(async () => {
+    try {
+      const res = await fetch("/api/reports");
+      const data = await res.json();
+      if (res.ok) setReports(data.reports || []);
+    } catch {
+      /* */
+    }
+  }, []);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadReports();
+  }, [load, loadReports]);
+
+  async function setReportStatus(id: number, status: string) {
+    setMsg("");
+    setError("");
+    try {
+      const res = await fetch("/api/reports", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "error reporte");
+        return;
+      }
+      setMsg(`reporte #${id} → ${status}`);
+      await loadReports();
+    } catch {
+      setError("red caída");
+    }
+  }
 
   async function act(user: AdminUser, action: string) {
     setBusyId(user.id);
@@ -119,6 +164,93 @@ export default function AdminPanel() {
     <div className="admin-panel">
       {error ? <div className="form-error">{error}</div> : null}
       {msg ? <div className="form-ok">{msg}</div> : null}
+
+      <section className="admin-section">
+        <h2>reportes</h2>
+        <p className="muted">
+          Moderación de reportes de foro, nexo y DMs. open → reviewed /
+          dismissed.
+        </p>
+        {reports.length === 0 ? (
+          <p className="muted">sin reportes</p>
+        ) : (
+          <div className="admin-table-wrap">
+            <table className="forum-table admin-table">
+              <thead>
+                <tr>
+                  <th>id</th>
+                  <th>quién</th>
+                  <th>target</th>
+                  <th>motivo</th>
+                  <th>status</th>
+                  <th>acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reports.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.id}</td>
+                    <td>@{r.reporter_name || r.reporter_id}</td>
+                    <td>
+                      <code>
+                        {r.target_type}#{r.target_id}
+                      </code>
+                      {r.details ? (
+                        <div className="muted" style={{ fontSize: "0.75rem" }}>
+                          {r.details.slice(0, 80)}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td>{r.reason}</td>
+                    <td>
+                      <span
+                        className={`tag${r.status === "open" ? " hot" : ""}`}
+                      >
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="admin-actions">
+                      {r.status === "open" ? (
+                        <>
+                          <button
+                            type="button"
+                            className="mod-btn"
+                            onClick={() =>
+                              void setReportStatus(r.id, "reviewed")
+                            }
+                          >
+                            reviewed
+                          </button>
+                          <button
+                            type="button"
+                            className="mod-btn"
+                            onClick={() =>
+                              void setReportStatus(r.id, "dismissed")
+                            }
+                          >
+                            dismiss
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="mod-btn"
+                          onClick={() => void setReportStatus(r.id, "open")}
+                        >
+                          reopen
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <button type="button" className="btn secondary" onClick={loadReports}>
+          [ refresh reportes ]
+        </button>
+      </section>
 
       <section className="admin-section">
         <h2>borrar por id</h2>

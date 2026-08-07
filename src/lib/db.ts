@@ -108,6 +108,15 @@ export async function ensureSchema() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  // Firma PGP opcional (fingerprint del firmante + bloque opcional)
+  await db`
+    ALTER TABLE posts
+    ADD COLUMN IF NOT EXISTS pgp_fingerprint VARCHAR(64)
+  `;
+  await db`
+    ALTER TABLE posts
+    ADD COLUMN IF NOT EXISTS pgp_signature TEXT
+  `;
 
   await db`
     CREATE INDEX IF NOT EXISTS idx_threads_category ON threads(category_id)

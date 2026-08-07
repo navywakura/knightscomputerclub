@@ -125,12 +125,47 @@ export async function GET() {
         u.username AS reporter_name
       FROM reports r
       JOIN users u ON u.id = r.reporter_id
-      ORDER BY r.created_at DESC
+      ORDER BY
+        CASE WHEN r.status = 'open' THEN 0 ELSE 1 END,
+        r.created_at DESC
       LIMIT 100
     `;
     return NextResponse.json({ reports: rows });
   } catch (e) {
     console.error("[reports GET]", e);
+    return NextResponse.json({ error: "error" }, { status: 500 });
+  }
+}
+
+/** Actualizar estado: { id, status: open|reviewed|dismissed } */
+export async function PATCH(req: Request) {
+  try {
+    const user = await getSessionUser();
+    if (!user || !isOwnerUser(user)) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    const body = await req.json().catch(() => ({}));
+    const id = Number(body.id);
+    const status = String(body.status || "");
+    if (!id || !["open", "reviewed", "dismissed"].includes(status)) {
+      return NextResponse.json(
+        { error: "id y status (open|reviewed|dismissed) requeridos" },
+        { status: 400 }
+      );
+    }
+    await ensureSchema();
+    const db = getDb();
+    const rows = await db`
+      UPDATE reports SET status = ${status}
+      WHERE id = ${id}
+      RETURNING id, status
+    `;
+    if (!rows[0]) {
+      return NextResponse.json({ error: "no encontrado" }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true, report: rows[0] });
+  } catch (e) {
+    console.error("[reports PATCH]", e);
     return NextResponse.json({ error: "error" }, { status: 500 });
   }
 }

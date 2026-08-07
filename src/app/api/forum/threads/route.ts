@@ -17,6 +17,7 @@ export async function GET(req: Request) {
     const limit = Math.min(Number(searchParams.get("limit") || 40), 100);
 
     let rows;
+    // thumb: primer /api/media/N en el OP o en cualquier post del hilo
     if (category) {
       rows = await db`
         SELECT
@@ -27,7 +28,15 @@ export async function GET(req: Request) {
           u.is_vip AS author_is_vip,
           c.slug AS category_slug,
           c.name AS category_name,
-          COUNT(p.id)::int AS post_count
+          COUNT(p.id)::int AS post_count,
+          (
+            SELECT substring(p2.body from '/api/media/([0-9]+)')
+            FROM posts p2
+            WHERE p2.thread_id = t.id
+              AND p2.body ~ '/api/media/[0-9]+'
+            ORDER BY p2.created_at ASC
+            LIMIT 1
+          ) AS thumb_media_id
         FROM threads t
         JOIN users u ON u.id = t.author_id
         JOIN categories c ON c.id = t.category_id
@@ -47,7 +56,15 @@ export async function GET(req: Request) {
           u.is_vip AS author_is_vip,
           c.slug AS category_slug,
           c.name AS category_name,
-          COUNT(p.id)::int AS post_count
+          COUNT(p.id)::int AS post_count,
+          (
+            SELECT substring(p2.body from '/api/media/([0-9]+)')
+            FROM posts p2
+            WHERE p2.thread_id = t.id
+              AND p2.body ~ '/api/media/[0-9]+'
+            ORDER BY p2.created_at ASC
+            LIMIT 1
+          ) AS thumb_media_id
         FROM threads t
         JOIN users u ON u.id = t.author_id
         JOIN categories c ON c.id = t.category_id
@@ -58,7 +75,14 @@ export async function GET(req: Request) {
       `;
     }
 
-    return NextResponse.json({ threads: rows });
+    const threads = (rows as Record<string, unknown>[]).map((r) => ({
+      ...r,
+      thumb_url: r.thumb_media_id
+        ? `/api/media/${r.thumb_media_id}`
+        : null,
+    }));
+
+    return NextResponse.json({ threads });
   } catch (e) {
     console.error("[threads GET]", e);
     return NextResponse.json(

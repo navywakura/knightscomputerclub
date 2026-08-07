@@ -5,6 +5,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import RankBadge from "@/components/RankBadge";
 import { NotificationCenter } from "@web-notify/react";
+import {
+  notifySoundKindFromType,
+  playNotifySound,
+  unlockNotifyAudio,
+} from "@/lib/notify-sound";
 import { getRank, isOwnerUser, rankNameClass } from "@/lib/ranks";
 
 type User = {
@@ -46,6 +51,17 @@ export default function Header() {
     };
   }, [path]);
 
+  // desbloquear audio de notificaciones en primer gesto
+  useEffect(() => {
+    const unlock = () => unlockNotifyAudio();
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
@@ -83,8 +99,14 @@ export default function Header() {
                 <NotificationCenter
                   enabled
                   apiBase="/api/notifications"
-                  pollMs={8000}
+                  pollMs={6000}
                   desktopNotify
+                  onNewUnread={({ latest }) => {
+                    const kind = notifySoundKindFromType(
+                      latest?.type || "system"
+                    );
+                    playNotifySound(kind);
+                  }}
                   onNavigate={(href) => {
                     router.push(href);
                     router.refresh();

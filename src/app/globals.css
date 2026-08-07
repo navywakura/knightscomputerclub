@@ -4420,3 +4420,26 @@ body.nexo-app-active footer {
     row-gap: 4px;
   }
 }
+
+/* thread list thumbnail */
+.ft-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ft-thumb {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  background: #050807;
+}
+.post-pgp-badge {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  padding: 6px 8px;
+  border: 1px dashed var(--border);
+}

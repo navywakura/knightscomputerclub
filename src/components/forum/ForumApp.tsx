@@ -47,6 +47,8 @@ type ThreadRow = {
   post_count: number;
   category_slug?: string;
   category_name?: string;
+  thumb_url?: string | null;
+  thumb_media_id?: string | null;
 };
 
 type PostRow = {
@@ -60,6 +62,8 @@ type PostRow = {
   author_role?: string;
   author_is_vip?: boolean;
   author_avatar_url?: string | null;
+  pgp_fingerprint?: string | null;
+  pgp_signature?: string | null;
 };
 
 type ThreadDetail = {
@@ -830,6 +834,18 @@ export default function ForumApp({
                       onClick={() => openThread(t.id)}
                     >
                       <div className="ft-title">
+                        {t.thumb_url || t.thumb_media_id ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={
+                              t.thumb_url ||
+                              `/api/media/${t.thumb_media_id}`
+                            }
+                            alt=""
+                            className="ft-thumb"
+                            loading="lazy"
+                          />
+                        ) : null}
                         {t.sticky ? <span className="tag hot">sticky</span> : null}
                         {t.locked ? <span className="tag">locked</span> : null}
                         {t.title}
@@ -1186,6 +1202,20 @@ export default function ForumApp({
                           []
                         }
                       />
+                      {p.pgp_fingerprint ? (
+                        <div className="post-pgp-badge muted">
+                          🔐 firmado PGP ·{" "}
+                          <code>{String(p.pgp_fingerprint).slice(0, 16)}…</code>
+                          {p.pgp_signature ? (
+                            <details>
+                              <summary>ver firma</summary>
+                              <pre className="profile-pgp-block">
+                                {p.pgp_signature}
+                              </pre>
+                            </details>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </article>
                   );
                 })}

@@ -19,6 +19,8 @@ export default function ReplyForm({ threadId, onPosted }: Props) {
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [captchaKey, setCaptchaKey] = useState(0);
+  const [signPgp, setSignPgp] = useState(false);
+  const [pgpSig, setPgpSig] = useState("");
 
   const onCaptcha = useCallback(
     (p: { token: string; answer: string }) => {
@@ -41,6 +43,8 @@ export default function ReplyForm({ threadId, onPosted }: Props) {
           body,
           captcha_token: captchaToken,
           captcha_answer: captchaAnswer,
+          sign_pgp: signPgp,
+          pgp_signature: signPgp ? pgpSig : undefined,
         }),
       });
       const data = await res.json();
@@ -50,6 +54,8 @@ export default function ReplyForm({ threadId, onPosted }: Props) {
         return;
       }
       setBody("");
+      setPgpSig("");
+      setSignPgp(false);
       setCaptchaAnswer("");
       setCaptchaKey((k) => k + 1);
       if (onPosted) onPosted();
@@ -74,6 +80,25 @@ export default function ReplyForm({ threadId, onPosted }: Props) {
         required
         maxLength={20000}
       />
+      <label className="settings-radio" style={{ marginTop: 8 }}>
+        <input
+          type="checkbox"
+          checked={signPgp}
+          onChange={(e) => setSignPgp(e.target.checked)}
+          disabled={loading}
+        />
+        firmar post con PGP (fingerprint de /settings)
+      </label>
+      {signPgp ? (
+        <textarea
+          value={pgpSig}
+          onChange={(e) => setPgpSig(e.target.value)}
+          placeholder="(opcional) pegá firma clearsign/detached aquí"
+          rows={3}
+          maxLength={16000}
+          disabled={loading}
+        />
+      ) : null}
       <CaptchaField
         onChange={onCaptcha}
         disabled={loading}
