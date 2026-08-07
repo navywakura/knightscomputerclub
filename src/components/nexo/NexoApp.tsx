@@ -30,8 +30,10 @@ import {
   NEXO_POLL_HIDDEN_MS,
   NEXO_POLL_MS,
 } from "@/lib/nexo";
+import { parseNexoCommand } from "@/lib/nexo-commands";
 import { apiFetch, getStorage } from "@/lib/platform";
 import { getRank, rankNameClass } from "@/lib/ranks";
+import { playUiSfx } from "@/lib/ui-sfx";
 import { useRouter } from "next/navigation";
 
 type Me = {
@@ -570,6 +572,70 @@ export default function NexoApp({
   async function sendBoardMsg(e: FormEvent) {
     e.preventDefault();
     if (!boardId || !text.trim()) return;
+
+    // comandos IRC locales
+    const cmd = parseNexoCommand(text, me?.username);
+    if (cmd) {
+      if (cmd.type === "help" || cmd.type === "error") {
+        setError(cmd.text);
+        setText("");
+        return;
+      }
+      if (cmd.type === "clear") {
+        setMessages([]);
+        lastIdRef.current = 0;
+        setText("");
+        return;
+      }
+      if (cmd.type === "theme") {
+        if (cmd.theme === "default") {
+          document.body.removeAttribute("data-forum-theme");
+        } else {
+          document.body.setAttribute("data-forum-theme", cmd.theme);
+        }
+        try {
+          localStorage.setItem("kc_forum_theme", cmd.theme);
+        } catch {
+          /* */
+        }
+        setText("");
+        playUiSfx("click");
+        return;
+      }
+      if (cmd.type === "message") {
+        // enviar mensaje transformado (/me, /shrug…)
+        setText(cmd.body);
+        // fall through with transformed body
+        const body = cmd.body;
+        setSending(true);
+        setError("");
+        try {
+          const res = await apiFetch("/api/nexo/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ board_id: boardId, body }),
+          });
+          const d = await res.json();
+          if (!res.ok) {
+            setError(d.error || "error");
+            return;
+          }
+          setText("");
+          playUiSfx("send");
+          if (d.message) {
+            setMessages((prev) => [...prev, d.message]);
+            lastIdRef.current = Math.max(lastIdRef.current, d.message.id);
+            requestAnimationFrame(scrollBottom);
+          }
+        } catch {
+          setError("red caída");
+        } finally {
+          setSending(false);
+        }
+        return;
+      }
+    }
+
     setSending(true);
     setError("");
     try {
@@ -584,6 +650,7 @@ export default function NexoApp({
         return;
       }
       setText("");
+      playUiSfx("send");
       if (d.message) {
         setMessages((prev) => [...prev, d.message]);
         lastIdRef.current = Math.max(lastIdRef.current, d.message.id);

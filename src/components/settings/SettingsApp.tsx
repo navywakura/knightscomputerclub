@@ -9,6 +9,7 @@ import {
   ensureNotifyPermission,
   canUseDesktopNotify,
 } from "@/lib/browser-notify";
+import { isUiSfxEnabled, setUiSfxEnabled, playUiSfx } from "@/lib/ui-sfx";
 
 type Tab = "profile" | "friends" | "privacy" | "account";
 
@@ -82,6 +83,7 @@ export default function SettingsApp({ initialTab = "profile" }: Props) {
   const [outgoing, setOutgoing] = useState<FriendUser[]>([]);
   const [friendUser, setFriendUser] = useState("");
   const [notifyPerm, setNotifyPerm] = useState<string>("");
+  const [uiSfx, setUiSfx] = useState(true);
 
   const vip = Boolean(me?.is_vip || me?.role === "owner");
 
@@ -144,6 +146,7 @@ export default function SettingsApp({ initialTab = "profile" }: Props) {
     } else {
       setNotifyPerm("unsupported");
     }
+    setUiSfx(isUiSfxEnabled());
   }, []);
 
   async function uploadMedia(file: File): Promise<number | null> {
@@ -710,6 +713,31 @@ export default function SettingsApp({ initialTab = "profile" }: Props) {
             }}
           >
             [ activar notificaciones desktop ]
+          </button>
+
+          <h3 className="settings-sub">SFX de interfaz</h3>
+          <p className="muted" style={{ fontSize: "0.9rem" }}>
+            Clics y beeps estilo terminal (además del sonido de notificaciones).
+          </p>
+          <label className="settings-radio">
+            <input
+              type="checkbox"
+              checked={uiSfx}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setUiSfx(on);
+                setUiSfxEnabled(on);
+                if (on) playUiSfx("click");
+              }}
+            />
+            sonidos de UI activados
+          </label>
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={() => playUiSfx("boot")}
+          >
+            [ test modem blip ]
           </button>
 
           <div className="compose-toolbar" style={{ marginTop: 16 }}>

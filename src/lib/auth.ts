@@ -44,10 +44,18 @@ export async function createSessionToken(user: PublicUser) {
 
 export async function setSessionCookie(token: string) {
   const jar = await cookies();
+  // Lax permite OAuth redirects; Strict opcional vía COOKIE_SAMESITE=strict (OpenBSD sin OAuth cross-site)
+  const sameSiteRaw = (process.env.COOKIE_SAMESITE || "lax").toLowerCase();
+  const sameSite =
+    sameSiteRaw === "strict"
+      ? ("strict" as const)
+      : sameSiteRaw === "none"
+        ? ("none" as const)
+        : ("lax" as const);
   jar.set(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production" || sameSite === "none",
+    sameSite,
     path: "/",
     maxAge: MAX_AGE,
   });

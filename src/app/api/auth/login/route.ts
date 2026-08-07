@@ -6,10 +6,17 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { ensureSchema, getDb, type UserRow } from "@/lib/db";
+import { logServerError, publicError } from "@/lib/safe-error";
+import { loginSchema, parseJsonBody } from "@/lib/validate";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const raw = await req.json().catch(() => null);
+    const parsed = parseJsonBody(loginSchema, raw ?? {});
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const body = parsed.data;
     const login = String(body.login || body.username || body.email || "")
       .trim()
       .toLowerCase();
@@ -88,9 +95,9 @@ export async function POST(req: Request) {
         : undefined,
     });
   } catch (e) {
-    console.error("[login]", e);
+    logServerError("[login]", e);
     return NextResponse.json(
-      { error: "error interno — ¿DATABASE_URL configurada?" },
+      { error: publicError(e, "error interno del nodo") },
       { status: 500 }
     );
   }

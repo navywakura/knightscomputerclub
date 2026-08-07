@@ -57,8 +57,9 @@ export function getOAuthSiteUrl() {
   }
 }
 
-export function absoluteUrl(path: string) {
-  const base = getSiteUrl();
+/** URL absoluta para RSS / OG */
+export function absoluteUrl(path: string): string {
+  const base = getSiteUrl().replace(/\/$/, "");
   if (path.startsWith("http")) return path;
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
