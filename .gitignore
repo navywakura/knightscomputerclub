@@ -34,3 +34,7 @@ next-env.d.ts
 *.flac
 # playlists servidas por Next (public/)
 !public/reproductormp3/**/*.mp3
+
+# source assets (convertidos a public/)
+/pexels-photo-*.avif
+*.avif
