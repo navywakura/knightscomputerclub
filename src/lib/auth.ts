@@ -82,7 +82,8 @@ export async function getSessionUser(): Promise<PublicUser | null> {
       SELECT
         id, username, email, role, is_vip, banned, created_at,
         display_name, avatar_media_id, banner_media_id, dm_privacy, bio,
-        profile_theme, email_verified, deleted_at, connections
+        profile_theme, profile_music_media_id,
+        email_verified, deleted_at, connections
       FROM users
       WHERE id = ${id}
       LIMIT 1
@@ -95,6 +96,7 @@ export async function getSessionUser(): Promise<PublicUser | null> {
       dm_privacy: string | null;
       bio: string | null;
       profile_theme: string | null;
+      profile_music_media_id: number | null;
       email_verified: boolean;
       deleted_at: string | null;
       connections: unknown;
@@ -127,6 +129,7 @@ export async function getSessionUser(): Promise<PublicUser | null> {
       dm_privacy: u.dm_privacy,
       bio: u.bio,
       profile_theme: u.profile_theme,
+      profile_music_media_id: u.profile_music_media_id,
       email_verified: Boolean(u.email_verified),
       deleted_at: u.deleted_at,
       connections: u.connections as UserConnections | null,
@@ -193,6 +196,9 @@ export function toPublicUser(row: UserRow): PublicUser {
     profile_theme: row.profile_theme
       ? String(row.profile_theme)
       : "matrix",
+    profile_music_url: row.profile_music_media_id
+      ? `/api/media/${row.profile_music_media_id}`
+      : null,
     connections: parseConnections(row.connections),
     email_verified: Boolean(row.email_verified),
     email: row.email ? String(row.email) : undefined,

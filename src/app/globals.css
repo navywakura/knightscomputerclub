@@ -5346,6 +5346,91 @@ body.nexo-app-active footer {
   color: var(--pt-muted, var(--text-dim));
 }
 
+/* música del perfil público */
+.profile-music {
+  position: fixed;
+  z-index: 50;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(340px, calc(100vw - 24px));
+  padding: 8px 10px;
+  background: var(--pt-card-bg, rgba(10, 18, 10, 0.94));
+  border: 1px solid var(--pt-card-border, var(--border));
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 0 16px var(--pt-glow, transparent);
+  color: var(--pt-text, var(--text));
+  font-family: var(--font-ui);
+  backdrop-filter: blur(8px);
+}
+
+.profile-music-play,
+.profile-music-mute {
+  flex-shrink: 0;
+  border: 1px solid var(--pt-btn-border, var(--border));
+  background: var(--pt-btn-bg, #061006);
+  color: var(--pt-accent, var(--green));
+  font: inherit;
+  cursor: pointer;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 4px;
+}
+
+.profile-music-play:hover,
+.profile-music-mute:hover {
+  border-color: var(--pt-accent, var(--green));
+}
+
+.profile-music-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.profile-music-label {
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: var(--pt-accent, var(--green));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-music-hint {
+  font-size: 0.68rem;
+  color: var(--pt-muted, var(--text-dim));
+}
+
+.profile-music-vol {
+  width: 72px;
+  flex-shrink: 0;
+  accent-color: var(--pt-accent, var(--green));
+}
+
+.settings-music-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0 16px;
+}
+
+@media (max-width: 720px) {
+  .profile-music {
+    left: 8px;
+    bottom: 8px;
+    right: 8px;
+    max-width: none;
+  }
+  .profile-music-vol {
+    width: 56px;
+  }
+}
+
 /* settings: theme picker */
 .profile-theme-grid {
   display: grid;

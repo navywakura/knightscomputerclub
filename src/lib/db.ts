@@ -227,6 +227,11 @@ export async function ensureSchema() {
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS profile_theme VARCHAR(32) NOT NULL DEFAULT 'matrix'
   `;
+  // MP3 ambient del perfil público
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS profile_music_media_id INT REFERENCES media(id) ON DELETE SET NULL
+  `;
   // Verificación email + soft delete (7 días)
   await db`
     ALTER TABLE users
@@ -842,6 +847,7 @@ export type UserRow = {
   dm_privacy?: string | null;
   bio?: string | null;
   profile_theme?: string | null;
+  profile_music_media_id?: number | null;
   email_verified?: boolean;
   deleted_at?: string | null;
   connections?: UserConnections | string | null;
@@ -860,6 +866,7 @@ export type PublicUser = {
   dm_privacy: "everyone" | "friends";
   bio: string;
   profile_theme: string;
+  profile_music_url: string | null;
   connections: UserConnections;
   email_verified: boolean;
   email?: string;

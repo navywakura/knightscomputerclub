@@ -179,6 +179,9 @@ export const profilePatchSchema = z
         "sunset",
       ])
       .optional(),
+    profile_music_media_id: z
+      .union([z.coerce.number().int().positive(), z.null(), z.literal("")])
+      .optional(),
     dm_privacy: z.enum(["everyone", "friends"]).optional(),
     avatar_media_id: z
       .union([z.coerce.number().int().positive(), z.null(), z.literal("")])

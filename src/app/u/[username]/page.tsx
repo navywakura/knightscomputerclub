@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import RankBadge from "@/components/RankBadge";
 import ShareButton from "@/components/ShareButton";
+import ProfileMusicPlayer from "@/components/ProfileMusicPlayer";
 import { ensureSchema, getDb } from "@/lib/db";
 import { parseConnections } from "@/lib/auth";
 import { getRank, rankNameClass } from "@/lib/ranks";
@@ -25,7 +26,8 @@ async function loadUser(username: string) {
       SELECT
         id, username, role, is_vip, created_at,
         display_name, avatar_media_id, banner_media_id, bio, connections,
-        profile_theme, pgp_fingerprint, pgp_public_key
+        profile_theme, profile_music_media_id,
+        pgp_fingerprint, pgp_public_key
       FROM users
       WHERE lower(username) = ${uname}
         AND banned IS NOT TRUE
@@ -112,6 +114,9 @@ export default async function PublicProfilePage({ params }: Props) {
   const theme = getProfileTheme(u.profile_theme);
   const themeStyle = profileThemeStyle(theme);
   const bannerUrl = userBanner || theme.banner;
+  const musicUrl = u.profile_music_media_id
+    ? `/api/media/${u.profile_music_media_id}`
+    : null;
 
   return (
     <main
@@ -137,6 +142,13 @@ export default async function PublicProfilePage({ params }: Props) {
           className="profile-decor profile-decor-b"
           src={theme.decors[1]}
           alt=""
+        />
+      ) : null}
+
+      {musicUrl ? (
+        <ProfileMusicPlayer
+          src={musicUrl}
+          label={`@${String(u.username)} · soundtrack`}
         />
       ) : null}
 

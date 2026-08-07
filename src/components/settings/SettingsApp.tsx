@@ -42,6 +42,7 @@ type Me = {
   email?: string;
   pending_deletion?: boolean;
   profile_theme?: string;
+  profile_music_url?: string | null;
 };
 
 type FriendUser = {
@@ -82,6 +83,10 @@ export default function SettingsApp({
   const [profileTheme, setProfileTheme] = useState<ProfileThemeId>(
     DEFAULT_PROFILE_THEME
   );
+  const [musicId, setMusicId] = useState<number | null>(null);
+  const [musicUrl, setMusicUrl] = useState<string | null>(null);
+  const [musicClear, setMusicClear] = useState(false);
+  const [musicUploading, setMusicUploading] = useState(false);
   const [dmPrivacy, setDmPrivacy] = useState<"everyone" | "friends">("everyone");
   const [conn, setConn] = useState<Conn>({});
   const [avatarId, setAvatarId] = useState<number | null>(null);
@@ -126,6 +131,9 @@ export default function SettingsApp({
         ? u.profile_theme
         : DEFAULT_PROFILE_THEME
     );
+    setMusicUrl(u.profile_music_url || null);
+    setMusicId(null);
+    setMusicClear(false);
     setDmPrivacy(u.dm_privacy === "friends" ? "friends" : "everyone");
     setConn(u.connections || {});
     setAvatarPreview(u.avatar_url || null);
@@ -176,17 +184,39 @@ export default function SettingsApp({
     setUiSfx(isUiSfxEnabled());
   }, []);
 
-  async function uploadMedia(file: File): Promise<number | null> {
-    if (!file.type.startsWith("image/")) {
-      setError("solo imágenes (jpeg/png/webp/gif)");
-      return null;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      setError("imagen > 8MB");
-      return null;
+  async function uploadMedia(
+    file: File,
+    kind: "image" | "audio" = "image"
+  ): Promise<number | null> {
+    if (kind === "image") {
+      if (!file.type.startsWith("image/")) {
+        setError("solo imágenes (jpeg/png/webp/gif)");
+        return null;
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        setError("imagen > 8MB");
+        return null;
+      }
+    } else {
+      const okAudio =
+        file.type === "audio/mpeg" ||
+        file.type === "audio/mp3" ||
+        file.name.toLowerCase().endsWith(".mp3");
+      if (!okAudio) {
+        setError("solo MP3 (audio/mpeg)");
+        return null;
+      }
+      if (file.size > 12 * 1024 * 1024) {
+        setError("MP3 > 12MB — acortá el track");
+        return null;
+      }
     }
     const form = new FormData();
-    form.append("file", file, file.name || "photo.jpg");
+    form.append(
+      "file",
+      file,
+      file.name || (kind === "audio" ? "theme.mp3" : "photo.jpg")
+    );
     const res = await fetch("/api/media", {
       method: "POST",
       body: form,
@@ -195,7 +225,6 @@ export default function SettingsApp({
     const d = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = String(d.error || "error al subir");
-      // mensajes más claros para el usuario
       if (d.code === "nsfw_blocked") {
         setError(`moderación: ${msg}`);
       } else {
@@ -209,6 +238,23 @@ export default function SettingsApp({
       return null;
     }
     return id;
+  }
+
+  async function onMusicPick(file: File | null) {
+    if (!file) return;
+    setMusicUploading(true);
+    setError("");
+    try {
+      const id = await uploadMedia(file, "audio");
+      if (id) {
+        setMusicId(id);
+        setMusicUrl(`/api/media/${id}`);
+        setMusicClear(false);
+        setOk("MP3 listo — guardá el perfil para aplicar");
+      }
+    } finally {
+      setMusicUploading(false);
+    }
   }
 
   async function onAvatarPick(file: File | null) {
@@ -263,6 +309,8 @@ export default function SettingsApp({
       };
       if (avatarId !== null) payload.avatar_media_id = avatarId;
       if (bannerId !== null) payload.banner_media_id = bannerId;
+      if (musicClear) payload.profile_music_media_id = null;
+      else if (musicId !== null) payload.profile_music_media_id = musicId;
 
       const res = await apiFetch("/api/profile", {
         method: "PATCH",
@@ -278,6 +326,13 @@ export default function SettingsApp({
       setOk("perfil guardado");
       setAvatarId(null);
       setBannerId(null);
+      setMusicId(null);
+      setMusicClear(false);
+      if (d.user?.profile_music_url) {
+        setMusicUrl(d.user.profile_music_url);
+      } else if (musicClear) {
+        setMusicUrl(null);
+      }
     } catch {
       setError("red caída");
     } finally {
@@ -680,6 +735,52 @@ export default function SettingsApp({
                 </span>
               </button>
             ))}
+          </div>
+
+          <h3 className="settings-sub">música del perfil (MP3)</h3>
+          <p className="muted" style={{ fontSize: "0.85rem" }}>
+            Suena en loop en tu página pública. Máx 12MB · solo{" "}
+            <code>.mp3</code>. Respetá copyright / usá tracks libres.
+          </p>
+          <div className="settings-music-row">
+            {musicUrl && !musicClear ? (
+              <audio
+                controls
+                src={musicUrl}
+                style={{ width: "100%", maxWidth: 360, height: 36 }}
+              />
+            ) : (
+              <span className="muted" style={{ fontSize: "0.85rem" }}>
+                sin track todavía
+              </span>
+            )}
+            <div className="settings-inline">
+              <label className="btn secondary settings-file-btn">
+                {musicUploading ? "subiendo…" : "[ subir MP3 ]"}
+                <input
+                  type="file"
+                  accept="audio/mpeg,audio/mp3,.mp3"
+                  hidden
+                  disabled={musicUploading || uploading}
+                  onChange={(e) =>
+                    void onMusicPick(e.target.files?.[0] || null)
+                  }
+                />
+              </label>
+              {(musicUrl || musicId) && !musicClear ? (
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => {
+                    setMusicClear(true);
+                    setMusicId(null);
+                    setMusicUrl(null);
+                  }}
+                >
+                  [ quitar ]
+                </button>
+              ) : null}
+            </div>
           </div>
 
           <h3 className="settings-sub">conexiones</h3>

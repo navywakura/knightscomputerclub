@@ -7,7 +7,8 @@ import { mediaJsonSchema, parseJsonBody } from "@/lib/validate";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MAX_BYTES = 8 * 1024 * 1024; // 8MB
+const MAX_BYTES = 8 * 1024 * 1024; // 8MB imágenes/PDF
+const MAX_AUDIO_BYTES = 12 * 1024 * 1024; // 12MB MP3 perfil
 const IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -15,6 +16,11 @@ const IMAGE_TYPES = new Set([
   "image/gif",
 ]);
 const PDF_TYPE = "application/pdf";
+const AUDIO_TYPES = new Set([
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/x-mpeg",
+]);
 
 /** Magic bytes %PDF */
 function looksLikePdf(buf: Buffer): boolean {
@@ -22,7 +28,20 @@ function looksLikePdf(buf: Buffer): boolean {
   return buf.subarray(0, 5).toString("ascii") === "%PDF-";
 }
 
-/** Subir imagen o PDF (multipart "file" o JSON base64) — máx 8MB */
+/** ID3 tag o frame MPEG */
+function looksLikeMp3(buf: Buffer): boolean {
+  if (buf.length < 3) return false;
+  if (buf[0] === 0x49 && buf[1] === 0x44 && buf[2] === 0x33) return true; // ID3
+  // frame sync 0xFFEx
+  if (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0) return true;
+  return false;
+}
+
+function isAudioMime(mime: string): boolean {
+  return AUDIO_TYPES.has(mime) || mime === "audio/mpeg";
+}
+
+/** Subir imagen, PDF o MP3 (perfil) — multipart o JSON base64 */
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
@@ -46,21 +65,32 @@ export async function POST(req: Request) {
       }
       filename = String(file.name || "").slice(0, 180);
       mime = file.type || "application/octet-stream";
-      // algunos browsers mandan application/octet-stream en PDF
+      // algunos browsers mandan application/octet-stream
       if (
         (!mime || mime === "application/octet-stream") &&
         filename.toLowerCase().endsWith(".pdf")
       ) {
         mime = PDF_TYPE;
       }
-      if (!IMAGE_TYPES.has(mime) && mime !== PDF_TYPE) {
+      if (
+        (!mime || mime === "application/octet-stream") &&
+        filename.toLowerCase().endsWith(".mp3")
+      ) {
+        mime = "audio/mpeg";
+      }
+      const isAudio = isAudioMime(mime) || filename.toLowerCase().endsWith(".mp3");
+      const max = isAudio ? MAX_AUDIO_BYTES : MAX_BYTES;
+      if (!IMAGE_TYPES.has(mime) && mime !== PDF_TYPE && !isAudio) {
         return NextResponse.json(
-          { error: "solo jpeg/png/webp/gif o PDF" },
+          { error: "solo jpeg/png/webp/gif, PDF o MP3" },
           { status: 400 }
         );
       }
-      if (file.size > MAX_BYTES) {
-        return NextResponse.json({ error: "archivo > 8MB" }, { status: 400 });
+      if (file.size > max) {
+        return NextResponse.json(
+          { error: isAudio ? "MP3 > 12MB" : "archivo > 8MB" },
+          { status: 400 }
+        );
       }
       buf = Buffer.from(await file.arrayBuffer());
     } else {
@@ -73,9 +103,10 @@ export async function POST(req: Request) {
       const b64 = String(body.data || body.base64 || "");
       mime = String(body.mime || body.type || "image/jpeg");
       filename = String(body.filename || body.name || "").slice(0, 180);
-      if (!IMAGE_TYPES.has(mime) && mime !== PDF_TYPE) {
+      const isAudio = isAudioMime(mime) || filename.toLowerCase().endsWith(".mp3");
+      if (!IMAGE_TYPES.has(mime) && mime !== PDF_TYPE && !isAudio) {
         return NextResponse.json(
-          { error: "solo jpeg/png/webp/gif o PDF" },
+          { error: "solo jpeg/png/webp/gif, PDF o MP3" },
           { status: 400 }
         );
       }
@@ -87,8 +118,12 @@ export async function POST(req: Request) {
       }
       const raw = b64.includes(",") ? b64.split(",")[1] : b64;
       buf = Buffer.from(raw, "base64");
-      if (buf.length > MAX_BYTES) {
-        return NextResponse.json({ error: "archivo > 8MB" }, { status: 400 });
+      const max = isAudio ? MAX_AUDIO_BYTES : MAX_BYTES;
+      if (buf.length > max) {
+        return NextResponse.json(
+          { error: isAudio ? "MP3 > 12MB" : "archivo > 8MB" },
+          { status: 400 }
+        );
       }
     }
 
@@ -96,7 +131,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "archivo vacío" }, { status: 400 });
     }
 
+    // normalizar audio
+    if (
+      isAudioMime(mime) ||
+      filename.toLowerCase().endsWith(".mp3") ||
+      looksLikeMp3(buf)
+    ) {
+      if (!looksLikeMp3(buf) && !isAudioMime(mime)) {
+        return NextResponse.json({ error: "MP3 inválido" }, { status: 400 });
+      }
+      mime = "audio/mpeg";
+    }
+
     const isPdf = mime === PDF_TYPE || looksLikePdf(buf);
+    const isAudio = mime === "audio/mpeg";
     if (isPdf) {
       if (!looksLikePdf(buf)) {
         return NextResponse.json(
@@ -105,8 +153,8 @@ export async function POST(req: Request) {
         );
       }
       mime = PDF_TYPE;
-    } else {
-      // Automoderación NSFW solo imágenes (fail-open si no hay key / API caída)
+    } else if (!isAudio) {
+      // Automoderación NSFW solo imágenes
       try {
         const mod = await moderateImageBuffer(buf, mime);
         if (!mod.allowed) {
@@ -121,7 +169,6 @@ export async function POST(req: Request) {
           );
         }
       } catch (modErr) {
-        // Nunca tumbar avatar/banner por un throw inesperado del moderador
         console.error("[media] nsfw throw — allow", modErr);
       }
     }
@@ -138,12 +185,17 @@ export async function POST(req: Request) {
     const id = rows[0].id as number;
     const url = `/api/media/${id}`;
     let markdown: string;
+    let kind: "pdf" | "image" | "audio" = "image";
     if (isPdf) {
+      kind = "pdf";
       const safeName =
         (filename || "documento.pdf")
           .replace(/[\[\]()]/g, "")
           .replace(/\.pdf$/i, "") + ".pdf";
       markdown = `[📎 ${safeName}](${url}?download=1)`;
+    } else if (isAudio) {
+      kind = "audio";
+      markdown = `[♪ audio](${url})`;
     } else {
       markdown = `![imagen](${url})`;
     }
@@ -155,7 +207,7 @@ export async function POST(req: Request) {
         markdown,
         mime: rows[0].mime,
         size_bytes: rows[0].size_bytes,
-        kind: isPdf ? "pdf" : "image",
+        kind,
         filename: filename || null,
       },
       { status: 201 }
