@@ -106,7 +106,7 @@ export default function Header() {
       </div>
 
       <nav className="nav" aria-label="main">
-        {NAV.map((item, i) => {
+        {NAV.map((item) => {
           const active =
             item.href === "/"
               ? path === "/"
@@ -115,9 +115,13 @@ export default function Header() {
           if (user && (item.href === "/auth/login" || item.href === "/auth/register")) {
             return null;
           }
+          // /forum solo para usuarios registrados
+          if (!user && item.href === "/forum") {
+            return null;
+          }
           return (
             <span key={item.href}>
-              {i > 0 && <span className="sep">|</span>}
+              <span className="sep">|</span>
               <Link href={item.href} className={active ? "active" : ""}>
                 {item.label}
               </Link>

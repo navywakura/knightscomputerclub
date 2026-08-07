@@ -7,6 +7,10 @@ const ONLINE_WINDOW_MIN = 5;
 
 export async function GET() {
   try {
+    const user = await getSessionUser();
+    if (!user || user.banned) {
+      return NextResponse.json({ error: "login requerido", online: [] }, { status: 401 });
+    }
     await ensureSchema();
     const db = getDb();
     const rows = await db`

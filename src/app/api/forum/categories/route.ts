@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import { getSessionUser } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
 
 export async function GET() {
   try {
+    const user = await getSessionUser();
+    if (!user || user.banned) {
+      return NextResponse.json({ error: "login requerido" }, { status: 401 });
+    }
     await ensureSchema();
     const db = getDb();
     const rows = await db`

@@ -5,6 +5,10 @@ import { isOwnerUser } from "@/lib/ranks";
 
 export async function GET(req: Request) {
   try {
+    const user = await getSessionUser();
+    if (!user || user.banned) {
+      return NextResponse.json({ error: "login requerido" }, { status: 401 });
+    }
     await ensureSchema();
     const db = getDb();
     const { searchParams } = new URL(req.url);
