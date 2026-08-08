@@ -50,6 +50,7 @@ type Me = {
   banner_url?: string | null;
   bio?: string;
   dm_privacy?: "everyone" | "friends";
+  email_digest_enabled?: boolean;
   connections?: Conn;
   email_verified?: boolean;
   email?: string;
@@ -112,6 +113,7 @@ export default function SettingsApp({
   const [customAccent, setCustomAccent] = useState("");
   const [customCss, setCustomCss] = useState("");
   const [dmPrivacy, setDmPrivacy] = useState<"everyone" | "friends">("everyone");
+  const [emailDigest, setEmailDigest] = useState(true);
   const [conn, setConn] = useState<Conn>({});
   const [avatarId, setAvatarId] = useState<number | null>(null);
   const [bannerId, setBannerId] = useState<number | null>(null);
@@ -169,6 +171,7 @@ export default function SettingsApp({
     setCustomAccent(pc.accent || "");
     setCustomCss(pc.css || "");
     setDmPrivacy(u.dm_privacy === "friends" ? "friends" : "everyone");
+    setEmailDigest(u.email_digest_enabled !== false);
     setConn(u.connections || {});
     setAvatarPreview(u.avatar_url || null);
     setBannerPreview(u.banner_url || null);
@@ -380,6 +383,7 @@ export default function SettingsApp({
           css: customCss.trim() || undefined,
         },
         dm_privacy: dmPrivacy,
+        email_digest_enabled: emailDigest,
         connections: conn,
         pgp_public_key: pgpKey,
         pgp_fingerprint: pgpFp,
@@ -1393,6 +1397,26 @@ export default function SettingsApp({
             />
             solo amigos
           </label>
+
+          <h3 className="settings-sub">resumen por email (cada 24h)</h3>
+          <p className="muted" style={{ fontSize: "0.9rem" }}>
+            Un solo correo al día con el resumen de DMs, replies y menciones
+            nuevas. No se envía un email por cada aviso.
+          </p>
+          <label className="settings-radio">
+            <input
+              type="checkbox"
+              checked={emailDigest}
+              onChange={(e) => setEmailDigest(e.target.checked)}
+              disabled={!me.email_verified}
+            />
+            recibir resumen diario por email
+          </label>
+          {!me.email_verified ? (
+            <p className="muted" style={{ fontSize: "0.8rem" }}>
+              necesitás email verificado para el resumen.
+            </p>
+          ) : null}
 
           <h3 className="settings-sub">notificaciones del sistema</h3>
           <p className="muted" style={{ fontSize: "0.9rem" }}>

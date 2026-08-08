@@ -101,7 +101,7 @@ export async function getSessionUser(): Promise<PublicUser | null> {
         id, username, email, role, is_vip, banned, created_at,
         display_name, avatar_media_id, banner_media_id, dm_privacy, bio,
         profile_theme, profile_music_media_id, profile_bg_media_id, profile_custom,
-        email_verified, deleted_at, connections
+        email_verified, email_digest_enabled, deleted_at, connections
       FROM users
       WHERE id = ${id}
       LIMIT 1
@@ -118,6 +118,7 @@ export async function getSessionUser(): Promise<PublicUser | null> {
       profile_bg_media_id: number | null;
       profile_custom: unknown;
       email_verified: boolean;
+      email_digest_enabled: boolean | null;
       deleted_at: string | null;
       connections: unknown;
     };
@@ -155,6 +156,10 @@ export async function getSessionUser(): Promise<PublicUser | null> {
       profile_bg_media_id: u.profile_bg_media_id,
       profile_custom: u.profile_custom,
       email_verified: Boolean(u.email_verified),
+      email_digest_enabled:
+        u.email_digest_enabled === undefined || u.email_digest_enabled === null
+          ? true
+          : Boolean(u.email_digest_enabled),
       deleted_at: u.deleted_at,
       connections: u.connections as UserConnections | null,
     });
@@ -234,6 +239,10 @@ export function toPublicUser(row: UserRow): PublicUser {
     profile_custom: parseProfileCustom(row.profile_custom),
     connections: parseConnections(row.connections),
     email_verified: Boolean(row.email_verified),
+    email_digest_enabled:
+      row.email_digest_enabled === undefined || row.email_digest_enabled === null
+        ? true
+        : Boolean(row.email_digest_enabled),
     email: row.email ? String(row.email) : undefined,
     pending_deletion,
     deletion_deadline,

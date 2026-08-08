@@ -197,6 +197,8 @@ export const profilePatchSchema = z
       })
       .optional(),
     dm_privacy: z.enum(["everyone", "friends"]).optional(),
+    /** Resumen diario de notificaciones por email (cada 24h) */
+    email_digest_enabled: z.boolean().optional(),
     avatar_media_id: z
       .union([z.coerce.number().int().positive(), z.null(), z.literal("")])
       .optional(),

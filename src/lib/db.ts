@@ -337,6 +337,22 @@ async function runEnsureSchemaOnce() {
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS pending_email VARCHAR(255)
   `;
+  // Resumen diario de notificaciones por email (cada 24h)
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS email_digest_enabled BOOLEAN NOT NULL DEFAULT TRUE
+  `;
+  await db`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS email_digest_last_sent TIMESTAMPTZ
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_users_email_digest
+      ON users (email_digest_last_sent)
+      WHERE email_digest_enabled IS TRUE
+        AND email_verified IS TRUE
+        AND banned IS NOT TRUE
+  `;
   await db`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ
@@ -951,6 +967,8 @@ export type UserRow = {
   profile_bg_media_id?: number | null;
   profile_custom?: unknown;
   email_verified?: boolean;
+  email_digest_enabled?: boolean;
+  email_digest_last_sent?: string | null;
   deleted_at?: string | null;
   connections?: UserConnections | string | null;
 };
@@ -979,6 +997,7 @@ export type PublicUser = {
   };
   connections: UserConnections;
   email_verified: boolean;
+  email_digest_enabled: boolean;
   email?: string;
   pending_deletion?: boolean;
   deletion_deadline?: string | null;

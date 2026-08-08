@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getSessionUser,
+  invalidateSessionUserCache,
   sanitizeUsername,
   toPublicUser,
 } from "@/lib/auth";
@@ -278,6 +279,13 @@ export async function PATCH(req: Request) {
       `;
     }
 
+    if ("email_digest_enabled" in body) {
+      const on = Boolean(body.email_digest_enabled);
+      await db`
+        UPDATE users SET email_digest_enabled = ${on} WHERE id = ${user.id}
+      `;
+    }
+
     if ("avatar_media_id" in body) {
       const mid =
         body.avatar_media_id === null || body.avatar_media_id === ""
@@ -410,10 +418,11 @@ export async function PATCH(req: Request) {
         id, username, email, password_hash, role, is_vip, banned, created_at,
         display_name, avatar_media_id, banner_media_id, dm_privacy, bio,
         profile_theme, profile_music_media_id, profile_bg_media_id, profile_custom,
-        email_verified, deleted_at, connections,
+        email_verified, email_digest_enabled, deleted_at, connections,
         pgp_public_key, pgp_fingerprint
       FROM users WHERE id = ${user.id} LIMIT 1
     `;
+    invalidateSessionUserCache(user.id);
     const pub = toPublicUser(rows[0] as UserRow);
     const r = rows[0] as Record<string, unknown>;
     return NextResponse.json({
