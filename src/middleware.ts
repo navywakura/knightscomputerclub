@@ -51,6 +51,7 @@ const STRICT: Array<{ prefix: string; max: number; windowMs: number }> = [
   { prefix: "/api/reports", max: 15, windowMs: 60_000 },
   { prefix: "/api/captcha", max: 40, windowMs: 60_000 },
   { prefix: "/api/paste", max: 30, windowMs: 60_000 },
+  { prefix: "/api/search", max: 40, windowMs: 60_000 },
 ];
 
 export function middleware(req: NextRequest) {

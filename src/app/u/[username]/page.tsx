@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import RankBadge from "@/components/RankBadge";
 import ShareButton from "@/components/ShareButton";
 import ProfileMusicPlayer from "@/components/ProfileMusicPlayer";
+import ProfileNavBar from "@/components/ProfileNavBar";
 import FollowButton from "@/components/FollowButton";
 import { ensureSchema, getDb } from "@/lib/db";
 import { getSessionUser, parseConnections } from "@/lib/auth";
@@ -249,7 +250,7 @@ export default async function PublicProfilePage({ params }: Props) {
   };
 
   return (
-    <main
+    <div
       className={`page profile-public profile-theme profile-theme-${theme.id}${
         pageBgUrl ? " has-custom-bg" : ""
       }`}
@@ -268,6 +269,8 @@ export default async function PublicProfilePage({ params }: Props) {
         />
       ) : null}
       <div className="profile-theme-bg" aria-hidden />
+
+      <ProfileNavBar />
 
       {theme.decors[0] ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -469,6 +472,6 @@ export default async function PublicProfilePage({ params }: Props) {
           </ul>
         )}
       </section>
-    </main>
+    </div>
   );
 }
