@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser, requireVerified } from "@/lib/auth";
 import { verifyCaptcha } from "@/lib/captcha";
 import { ensureSchema, getDb } from "@/lib/db";
+import { firstMediaId } from "@/lib/markdown";
 import { isOwnerUser } from "@/lib/ranks";
 import { forumThreadSchema, readJsonBody } from "@/lib/validate";
 
@@ -17,33 +18,24 @@ export async function GET(req: Request) {
     const category = searchParams.get("category");
     const limit = Math.min(Number(searchParams.get("limit") || 40), 100);
 
+    // post_count / thumb_media_id denormalizados en threads (sin COUNT ni regex por hilo)
     let rows;
-    // thumb: primer /api/media/N en el OP o en cualquier post del hilo
     if (category) {
       rows = await db`
         SELECT
           t.id, t.category_id, t.author_id, t.title, t.locked, t.sticky,
           t.created_at, t.updated_at,
+          t.post_count,
+          t.thumb_media_id,
           u.username AS author_name,
           u.role AS author_role,
           u.is_vip AS author_is_vip,
           c.slug AS category_slug,
-          c.name AS category_name,
-          COUNT(p.id)::int AS post_count,
-          (
-            SELECT substring(p2.body from '/api/media/([0-9]+)')
-            FROM posts p2
-            WHERE p2.thread_id = t.id
-              AND p2.body ~ '/api/media/[0-9]+'
-            ORDER BY p2.created_at ASC
-            LIMIT 1
-          ) AS thumb_media_id
+          c.name AS category_name
         FROM threads t
         JOIN users u ON u.id = t.author_id
         JOIN categories c ON c.id = t.category_id
-        LEFT JOIN posts p ON p.thread_id = t.id
         WHERE c.slug = ${category}
-        GROUP BY t.id, u.username, u.role, u.is_vip, c.slug, c.name
         ORDER BY t.sticky DESC, t.updated_at DESC
         LIMIT ${limit}
       `;
@@ -52,25 +44,16 @@ export async function GET(req: Request) {
         SELECT
           t.id, t.category_id, t.author_id, t.title, t.locked, t.sticky,
           t.created_at, t.updated_at,
+          t.post_count,
+          t.thumb_media_id,
           u.username AS author_name,
           u.role AS author_role,
           u.is_vip AS author_is_vip,
           c.slug AS category_slug,
-          c.name AS category_name,
-          COUNT(p.id)::int AS post_count,
-          (
-            SELECT substring(p2.body from '/api/media/([0-9]+)')
-            FROM posts p2
-            WHERE p2.thread_id = t.id
-              AND p2.body ~ '/api/media/[0-9]+'
-            ORDER BY p2.created_at ASC
-            LIMIT 1
-          ) AS thumb_media_id
+          c.name AS category_name
         FROM threads t
         JOIN users u ON u.id = t.author_id
         JOIN categories c ON c.id = t.category_id
-        LEFT JOIN posts p ON p.thread_id = t.id
-        GROUP BY t.id, u.username, u.role, u.is_vip, c.slug, c.name
         ORDER BY t.sticky DESC, t.updated_at DESC
         LIMIT ${limit}
       `;
@@ -162,10 +145,12 @@ export async function POST(req: Request) {
     }
     const categoryId = cats[0].id as number;
 
+    const thumbId = firstMediaId(content);
     const threads = await db`
-      INSERT INTO threads (category_id, author_id, title)
-      VALUES (${categoryId}, ${me.id}, ${title})
-      RETURNING id, category_id, author_id, title, locked, sticky, created_at, updated_at
+      INSERT INTO threads (category_id, author_id, title, post_count, thumb_media_id)
+      VALUES (${categoryId}, ${me.id}, ${title}, 1, ${thumbId})
+      RETURNING id, category_id, author_id, title, locked, sticky, created_at, updated_at,
+        post_count, thumb_media_id
     `;
     const thread = threads[0];
 

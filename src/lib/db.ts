@@ -38,7 +38,54 @@ export function isNexoDbSplit(): boolean {
   return Boolean(b && a && b !== a);
 }
 
+/**
+ * Schema + seeds: una sola vez por proceso (warm).
+ * Mantenimiento (purges): como mucho cada 10 min.
+ * Antes se ejecutaba en casi cada request de API → lag enorme con Neon HTTP.
+ */
+let schemaOnce: Promise<void> | null = null;
+let lastMaintenanceAt = 0;
+const MAINTENANCE_MS = 10 * 60_000;
+
 export async function ensureSchema() {
+  if (!schemaOnce) {
+    schemaOnce = runEnsureSchemaOnce().catch((e) => {
+      schemaOnce = null;
+      throw e;
+    });
+  }
+  await schemaOnce;
+  await runMaintenanceThrottled();
+}
+
+/** Forzar re-run (tests / migraciones manuales). */
+export function resetSchemaGuard() {
+  schemaOnce = null;
+  lastMaintenanceAt = 0;
+}
+
+async function runMaintenanceThrottled() {
+  const now = Date.now();
+  if (now - lastMaintenanceAt < MAINTENANCE_MS) return;
+  lastMaintenanceAt = now;
+  try {
+    const db = getDb();
+    await db`DELETE FROM pastes WHERE expires_at < NOW()`.catch(() => {});
+    await db`
+      DELETE FROM nexo_dm_messages
+      WHERE expires_at IS NOT NULL AND expires_at < NOW()
+    `.catch(() => {});
+    await db`
+      DELETE FROM users
+      WHERE deleted_at IS NOT NULL
+        AND deleted_at < NOW() - INTERVAL '7 days'
+    `.catch(() => {});
+  } catch {
+    /* */
+  }
+}
+
+async function runEnsureSchemaOnce() {
   const db = getDb();
 
   await db`
@@ -147,6 +194,36 @@ export async function ensureSchema() {
   await db`
     CREATE INDEX IF NOT EXISTS idx_posts_thread ON posts(thread_id)
   `;
+  // denormalizados para listados de hilos rápidos
+  await db`
+    ALTER TABLE threads
+    ADD COLUMN IF NOT EXISTS post_count INT NOT NULL DEFAULT 0
+  `;
+  await db`
+    ALTER TABLE threads
+    ADD COLUMN IF NOT EXISTS thumb_media_id INT
+  `;
+  await db`
+    CREATE INDEX IF NOT EXISTS idx_threads_updated
+      ON threads (sticky DESC, updated_at DESC)
+  `;
+  // backfill barato (solo hilos con post_count 0 que sí tienen posts)
+  try {
+    await db`
+      UPDATE threads t
+      SET post_count = sub.cnt
+      FROM (
+        SELECT thread_id, COUNT(*)::int AS cnt
+        FROM posts
+        GROUP BY thread_id
+      ) sub
+      WHERE t.id = sub.thread_id
+        AND t.post_count = 0
+        AND sub.cnt > 0
+    `;
+  } catch {
+    /* */
+  }
 
   await db`
     CREATE TABLE IF NOT EXISTS link_previews (
@@ -563,34 +640,6 @@ export async function ensureSchema() {
     console.error("[ensureSchema] sync nexo→forum", e);
   }
 
-  // purga pastes vencidos
-  try {
-    await db`DELETE FROM pastes WHERE expires_at < NOW()`;
-  } catch {
-    /* */
-  }
-
-  // Purga mensajes DM efímeros vencidos
-  try {
-    await db`
-      DELETE FROM nexo_dm_messages
-      WHERE expires_at IS NOT NULL AND expires_at < NOW()
-    `;
-  } catch {
-    /* */
-  }
-
-  // Purga soft-deletes vencidos
-  try {
-    await db`
-      DELETE FROM users
-      WHERE deleted_at IS NOT NULL
-        AND deleted_at < NOW() - INTERVAL '7 days'
-    `;
-  } catch {
-    /* */
-  }
-
   // Owner del nodo: roger / rogynavarro@gmail.com
   await db`
     UPDATE users
@@ -605,6 +654,10 @@ export async function ensureSchema() {
     WHERE lower(username) = 'roger'
        OR lower(email) = 'rogynavarro@gmail.com'
   `;
+
+  // primer maintenance sin esperar el throttle
+  lastMaintenanceAt = 0;
+  await runMaintenanceThrottled();
 }
 
 /** Boards del foro. parent_slug null = top-level. */

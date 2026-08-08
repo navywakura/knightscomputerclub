@@ -3,7 +3,9 @@ import { getSessionUser, requireVerified } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
 import { canOpenDm } from "@/lib/friends";
 import {
+  authorizeDmAccess,
   canEditMessageByAge,
+  createDmUnlockToken,
   hashPin,
   isValidPin,
   NEXO_MSG_MAX,
@@ -46,14 +48,6 @@ export async function GET(req: Request) {
         SELECT id, username, role, is_vip FROM users WHERE id = ${peerId} LIMIT 1
       `;
 
-      // purgar efímeros vencidos de este hilo
-      await db`
-        DELETE FROM nexo_dm_messages
-        WHERE thread_id = ${threadId}
-          AND expires_at IS NOT NULL
-          AND expires_at < NOW()
-      `;
-
       const messages = after
         ? await db`
             SELECT
@@ -66,7 +60,9 @@ export async function GET(req: Request) {
               u.avatar_media_id AS author_avatar_media_id
             FROM nexo_dm_messages m
             JOIN users u ON u.id = m.author_id
-            WHERE m.thread_id = ${threadId} AND m.id > ${after}
+            WHERE m.thread_id = ${threadId}
+              AND m.id > ${after}
+              AND (m.expires_at IS NULL OR m.expires_at > NOW())
             ORDER BY m.id ASC
             LIMIT 100
           `
@@ -82,6 +78,7 @@ export async function GET(req: Request) {
             FROM nexo_dm_messages m
             JOIN users u ON u.id = m.author_id
             WHERE m.thread_id = ${threadId}
+              AND (m.expires_at IS NULL OR m.expires_at > NOW())
             ORDER BY m.id DESC
             LIMIT 80
           `;
@@ -124,27 +121,42 @@ export async function GET(req: Request) {
       });
     }
 
-    // lista de threads del user
+    // lista de threads del user + peers en un solo query
     const threads = await db`
       SELECT
         t.id, t.user_low, t.user_high, t.created_by, t.created_at, t.updated_at,
-        CASE WHEN t.user_low = ${user.id} THEN t.user_high ELSE t.user_low END AS peer_id
+        CASE WHEN t.user_low = ${user.id} THEN t.user_high ELSE t.user_low END AS peer_id,
+        u.id AS peer_user_id,
+        u.username AS peer_username,
+        u.role AS peer_role,
+        u.is_vip AS peer_is_vip
       FROM nexo_dm_threads t
+      JOIN users u ON u.id = CASE
+        WHEN t.user_low = ${user.id} THEN t.user_high
+        ELSE t.user_low
+      END
       WHERE t.user_low = ${user.id} OR t.user_high = ${user.id}
       ORDER BY t.updated_at DESC
       LIMIT 50
     `;
 
-    const withPeers = [];
-    for (const t of threads) {
-      const p = await db`
-        SELECT id, username, role, is_vip FROM users WHERE id = ${t.peer_id} LIMIT 1
-      `;
-      withPeers.push({
-        ...t,
-        peer: p[0] || null,
-      });
-    }
+    const withPeers = (threads as Record<string, unknown>[]).map((t) => ({
+      id: t.id,
+      user_low: t.user_low,
+      user_high: t.user_high,
+      created_by: t.created_by,
+      created_at: t.created_at,
+      updated_at: t.updated_at,
+      peer_id: t.peer_id,
+      peer: t.peer_user_id
+        ? {
+            id: Number(t.peer_user_id),
+            username: String(t.peer_username || ""),
+            role: String(t.peer_role || "member"),
+            is_vip: Boolean(t.peer_is_vip),
+          }
+        : null,
+    }));
 
     return NextResponse.json({ threads: withPeers });
   } catch (e) {
@@ -155,9 +167,9 @@ export async function GET(req: Request) {
 
 /**
  * POST:
- * - action=open: { username, pin } → crea o abre DM (PIN de 4 dígitos de la conversación)
- * - action=message: { thread_id, body, pin } → envía (requiere pin válido)
- * - action=unlock: { thread_id, pin } → verifica pin
+ * - action=open: { username, pin } → crea o abre DM (PIN de 4 dígitos)
+ * - action=message: { thread_id, body, unlock_token|pin }
+ * - action=unlock: { thread_id, pin } → verifica pin + unlock_token
  */
 export async function POST(req: Request) {
   try {
@@ -211,7 +223,8 @@ export async function POST(req: Request) {
         if (!ok) {
           return NextResponse.json({ error: "PIN incorrecto" }, { status: 403 });
         }
-        return NextResponse.json({ ok: true, thread_id: threadId });
+        const unlock_token = await createDmUnlockToken(me.id, threadId);
+        return NextResponse.json({ ok: true, thread_id: threadId, unlock_token });
       }
 
       // open/create
@@ -234,7 +247,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "usuario no encontrado" }, { status: 404 });
       }
       const peerId = Number(peers[0].id);
-      // privacidad DMs del destinatario (everyone | friends)
       const allowed = await canOpenDm(db, me.id, peerId);
       if (!allowed.ok) {
         return NextResponse.json(
@@ -259,10 +271,13 @@ export async function POST(req: Request) {
             { status: 403 }
           );
         }
+        const tid = Number(existing[0].id);
+        const unlock_token = await createDmUnlockToken(me.id, tid);
         return NextResponse.json({
-          thread_id: existing[0].id,
+          thread_id: tid,
           peer: peers[0],
           created: false,
+          unlock_token,
         });
       }
 
@@ -272,8 +287,15 @@ export async function POST(req: Request) {
         VALUES (${low}, ${high}, ${pin_hash}, ${me.id})
         RETURNING id
       `;
+      const tid = Number(created[0].id);
+      const unlock_token = await createDmUnlockToken(me.id, tid);
       return NextResponse.json(
-        { thread_id: created[0].id, peer: peers[0], created: true },
+        {
+          thread_id: tid,
+          peer: peers[0],
+          created: true,
+          unlock_token,
+        },
         { status: 201 }
       );
     }
@@ -281,6 +303,7 @@ export async function POST(req: Request) {
     if (action === "message") {
       const threadId = Number(body.thread_id);
       const pin = String(body.pin || "").trim();
+      const unlockToken = String(body.unlock_token || "").trim();
       const text = String(body.body || "").trim();
       if (!threadId || !text) {
         return NextResponse.json(
@@ -290,9 +313,6 @@ export async function POST(req: Request) {
       }
       if (text.length > NEXO_MSG_MAX) {
         return NextResponse.json({ error: "mensaje demasiado largo" }, { status: 400 });
-      }
-      if (!isValidPin(pin)) {
-        return NextResponse.json({ error: "PIN de 4 dígitos requerido" }, { status: 400 });
       }
 
       const thr = await db`
@@ -305,13 +325,22 @@ export async function POST(req: Request) {
       if (!thr[0]) {
         return NextResponse.json({ error: "dm no encontrado" }, { status: 404 });
       }
-      const ok = await verifyPin(pin, String(thr[0].pin_hash));
+      const ok = await authorizeDmAccess({
+        userId: me.id,
+        threadId,
+        pinHash: String(thr[0].pin_hash),
+        pin,
+        unlockToken,
+      });
       if (!ok) {
-        return NextResponse.json({ error: "PIN incorrecto" }, { status: 403 });
+        return NextResponse.json(
+          { error: "PIN o unlock requerido", code: "dm_locked" },
+          { status: 403 }
+        );
       }
 
       const eph = Number(thr[0].ephemeral_minutes || 0);
-      const expiresSql =
+      const rows =
         eph > 0
           ? await db`
               INSERT INTO nexo_dm_messages (thread_id, author_id, body, expires_at, updated_at)
@@ -327,7 +356,6 @@ export async function POST(req: Request) {
               VALUES (${threadId}, ${me.id}, ${text}, NOW())
               RETURNING id, thread_id, author_id, body, created_at, edited_at, deleted, expires_at
             `;
-      const rows = expiresSql;
       await db`
         UPDATE nexo_dm_threads SET updated_at = NOW() WHERE id = ${threadId}
       `;
@@ -338,7 +366,8 @@ export async function POST(req: Request) {
           : Number(thr[0].user_low);
       const excerpt =
         text.length > 120 ? text.slice(0, 119).trimEnd() + "…" : text;
-      await safeNotify({
+      // notify en background — no bloquear respuesta del send
+      void safeNotify({
         userId: peerId,
         type: "nexo.dm",
         title: `DM de @${me.username}`,
@@ -369,14 +398,15 @@ export async function POST(req: Request) {
     if (action === "edit" || action === "delete") {
       const messageId = Number(body.message_id || body.id);
       const pin = String(body.pin || "").trim();
-      if (!messageId || !isValidPin(pin)) {
+      const unlockToken = String(body.unlock_token || "").trim();
+      if (!messageId) {
         return NextResponse.json(
-          { error: "message_id y pin requeridos" },
+          { error: "message_id requerido" },
           { status: 400 }
         );
       }
       const msg = await db`
-        SELECT m.*, t.pin_hash, t.user_low, t.user_high
+        SELECT m.*, t.pin_hash, t.user_low, t.user_high, t.id AS thr_id
         FROM nexo_dm_messages m
         JOIN nexo_dm_threads t ON t.id = m.thread_id
         WHERE m.id = ${messageId}
@@ -386,9 +416,16 @@ export async function POST(req: Request) {
       if (!msg[0]) {
         return NextResponse.json({ error: "mensaje no encontrado" }, { status: 404 });
       }
-      const ok = await verifyPin(pin, String(msg[0].pin_hash));
+      const thrId = Number(msg[0].thr_id || msg[0].thread_id);
+      const ok = await authorizeDmAccess({
+        userId: me.id,
+        threadId: thrId,
+        pinHash: String(msg[0].pin_hash),
+        pin,
+        unlockToken,
+      });
       if (!ok) {
-        return NextResponse.json({ error: "PIN incorrecto" }, { status: 403 });
+        return NextResponse.json({ error: "PIN o unlock requerido" }, { status: 403 });
       }
       if (Number(msg[0].author_id) !== me.id) {
         return NextResponse.json({ error: "solo el autor" }, { status: 403 });
@@ -427,12 +464,13 @@ export async function POST(req: Request) {
     if (action === "ephemeral") {
       const threadId = Number(body.thread_id);
       const pin = String(body.pin || "").trim();
+      const unlockToken = String(body.unlock_token || "").trim();
       let minutes = Number(body.minutes ?? body.ephemeral_minutes ?? 0);
       if (!Number.isFinite(minutes) || minutes < 0) minutes = 0;
       minutes = Math.min(Math.floor(minutes), 60 * 24 * 7); // max 7 días
-      if (!threadId || !isValidPin(pin)) {
+      if (!threadId) {
         return NextResponse.json(
-          { error: "thread_id y pin requeridos" },
+          { error: "thread_id requerido" },
           { status: 400 }
         );
       }
@@ -445,9 +483,15 @@ export async function POST(req: Request) {
       if (!thr[0]) {
         return NextResponse.json({ error: "dm no encontrado" }, { status: 404 });
       }
-      const ok = await verifyPin(pin, String(thr[0].pin_hash));
+      const ok = await authorizeDmAccess({
+        userId: me.id,
+        threadId,
+        pinHash: String(thr[0].pin_hash),
+        pin,
+        unlockToken,
+      });
       if (!ok) {
-        return NextResponse.json({ error: "PIN incorrecto" }, { status: 403 });
+        return NextResponse.json({ error: "PIN o unlock requerido" }, { status: 403 });
       }
       await db`
         UPDATE nexo_dm_threads

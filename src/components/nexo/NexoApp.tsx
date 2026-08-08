@@ -26,6 +26,7 @@ import {
   canCreateNexoBoard,
   canEditMessageByAge,
   dmUnlockKey,
+  dmUnlockTokenKey,
   NEXO_GROUP_MS,
   NEXO_POLL_HIDDEN_MS,
   NEXO_POLL_MS,
@@ -184,6 +185,8 @@ export default function NexoApp({
   const [dmMessages, setDmMessages] = useState<Msg[]>([]);
   const [dmPeer, setDmPeer] = useState<string>("");
   const [dmPin, setDmPin] = useState("");
+  /** JWT de unlock (evita bcrypt en cada send) */
+  const [dmUnlockToken, setDmUnlockToken] = useState("");
   const [dmUnlocked, setDmUnlocked] = useState(false);
   const [dmOpenUser, setDmOpenUser] = useState("");
   const [dmOpenPin, setDmOpenPin] = useState("");
@@ -260,6 +263,16 @@ export default function NexoApp({
               for (const m of list) {
                 if (!ids.has(m.id)) next.push(m);
               }
+              // quitar optimistas (id < 0) ya confirmados por el server
+              next = next.filter((m) => {
+                if (m.id > 0) return true;
+                return !list.some(
+                  (s) =>
+                    s.author_id === m.author_id &&
+                    s.body === m.body &&
+                    !s.deleted
+                );
+              });
               lastIdRef.current = Math.max(
                 lastIdRef.current,
                 ...list.map((m) => m.id)
@@ -343,10 +356,19 @@ export default function NexoApp({
         if (incremental && list.length) {
           setDmMessages((prev) => {
             const ids = new Set(prev.map((m) => m.id));
-            const merged = [...prev];
+            let merged = [...prev];
             for (const m of list) {
               if (!ids.has(m.id)) merged.push(m);
             }
+            merged = merged.filter((m) => {
+              if (m.id > 0) return true;
+              return !list.some(
+                (s) =>
+                  s.author_id === m.author_id &&
+                  s.body === m.body &&
+                  !s.deleted
+              );
+            });
             return merged;
           });
           dmLastIdRef.current = Math.max(
@@ -782,64 +804,76 @@ export default function NexoApp({
         return;
       }
       if (cmd.type === "message") {
-        // enviar mensaje transformado (/me, /shrug…)
-        setText(cmd.body);
-        // fall through with transformed body
-        const body = cmd.body;
-        setSending(true);
-        setError("");
-        try {
-          const res = await apiFetch("/api/nexo/messages", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ board_id: boardId, body }),
-          });
-          const d = await res.json();
-          if (!res.ok) {
-            setError(d.error || "error");
-            return;
-          }
-          setText("");
-          playUiSfx("send");
-          if (d.message) {
-            setMessages((prev) => [...prev, d.message]);
-            lastIdRef.current = Math.max(lastIdRef.current, d.message.id);
-            requestAnimationFrame(scrollBottom);
-          }
-        } catch {
-          setError("red caída");
-        } finally {
-          setSending(false);
-        }
+        await postBoardBody(cmd.body);
         return;
       }
     }
 
-    setSending(true);
+    await postBoardBody(text);
+  }
+
+  /** Envío optimista de mensaje de board (pinta al toque, reconcilia al POST) */
+  async function postBoardBody(raw: string) {
+    if (!boardId || !me) return;
+    const body = raw.trim();
+    if (!body) return;
+    const tempId = -Date.now();
+    const optimistic: Msg = {
+      id: tempId,
+      author_id: me.id,
+      author_name: me.username,
+      author_role: me.role,
+      author_is_vip: me.is_vip,
+      body,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimistic]);
+    setText("");
     setError("");
+    playUiSfx("send");
+    requestAnimationFrame(scrollBottom);
+    setSending(true);
     try {
       const res = await apiFetch("/api/nexo/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ board_id: boardId, body: text }),
+        body: JSON.stringify({ board_id: boardId, body }),
       });
       const d = await res.json();
       if (!res.ok) {
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        setText(body);
         setError(d.error || "error");
         return;
       }
-      setText("");
-      playUiSfx("send");
       if (d.message) {
-        setMessages((prev) => [...prev, d.message]);
-        lastIdRef.current = Math.max(lastIdRef.current, d.message.id);
-        requestAnimationFrame(scrollBottom);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? (d.message as Msg) : m))
+        );
+        lastIdRef.current = Math.max(lastIdRef.current, Number(d.message.id));
       }
     } catch {
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setText(body);
       setError("red caída");
     } finally {
       setSending(false);
     }
+  }
+
+  function rememberDmUnlock(threadId: number, token?: string | null) {
+    const st = getStorage();
+    st?.setItem(dmUnlockKey(threadId), "1");
+    if (token) {
+      st?.setItem(dmUnlockTokenKey(threadId), token);
+      setDmUnlockToken(token);
+    }
+  }
+
+  function dmAuthBody(): { pin?: string; unlock_token?: string } {
+    if (dmUnlockToken) return { unlock_token: dmUnlockToken };
+    if (dmPin) return { pin: dmPin };
+    return {};
   }
 
   async function openDm(e: FormEvent) {
@@ -865,8 +899,7 @@ export default function NexoApp({
       setDmId(tid);
       setDmPin(dmOpenPin);
       setDmUnlocked(true);
-      const st = getStorage();
-      st?.setItem(dmUnlockKey(tid), "1");
+      rememberDmUnlock(tid, d.unlock_token ? String(d.unlock_token) : null);
       setShowDmOpen(false);
       setDmOpenUser("");
       setDmOpenPin("");
@@ -899,7 +932,7 @@ export default function NexoApp({
         return;
       }
       setDmUnlocked(true);
-      getStorage()?.setItem(dmUnlockKey(dmId), "1");
+      rememberDmUnlock(dmId, d.unlock_token ? String(d.unlock_token) : null);
     } catch {
       setError("red caída");
     } finally {
@@ -909,9 +942,28 @@ export default function NexoApp({
 
   async function sendDm(e: FormEvent) {
     e.preventDefault();
-    if (!dmId || !text.trim() || !dmPin) return;
-    setSending(true);
+    if (!dmId || !text.trim() || !me) return;
+    if (!dmUnlockToken && !dmPin) {
+      setError("desbloqueá el DM con el PIN");
+      return;
+    }
+    const body = text.trim();
+    const tempId = -Date.now();
+    const optimistic: Msg = {
+      id: tempId,
+      author_id: me.id,
+      author_name: me.username,
+      author_role: me.role,
+      author_is_vip: me.is_vip,
+      body,
+      created_at: new Date().toISOString(),
+    };
+    setDmMessages((prev) => [...prev, optimistic]);
+    setText("");
     setError("");
+    playUiSfx("send");
+    requestAnimationFrame(scrollBottom);
+    setSending(true);
     try {
       const res = await apiFetch("/api/nexo/dm", {
         method: "POST",
@@ -919,22 +971,35 @@ export default function NexoApp({
         body: JSON.stringify({
           action: "message",
           thread_id: dmId,
-          body: text,
-          pin: dmPin,
+          body,
+          ...dmAuthBody(),
         }),
       });
       const d = await res.json();
       if (!res.ok) {
+        setDmMessages((prev) => prev.filter((m) => m.id !== tempId));
+        setText(body);
         setError(d.error || "error");
+        if (d.code === "dm_locked") {
+          setDmUnlocked(false);
+          setDmUnlockToken("");
+          getStorage()?.removeItem(dmUnlockKey(dmId));
+          getStorage()?.removeItem(dmUnlockTokenKey(dmId));
+        }
         return;
       }
-      setText("");
       if (d.message) {
-        setDmMessages((prev) => [...prev, d.message]);
-        dmLastIdRef.current = Math.max(dmLastIdRef.current, d.message.id);
-        requestAnimationFrame(scrollBottom);
+        setDmMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? (d.message as Msg) : m))
+        );
+        dmLastIdRef.current = Math.max(
+          dmLastIdRef.current,
+          Number(d.message.id)
+        );
       }
     } catch {
+      setDmMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setText(body);
       setError("red caída");
     } finally {
       setSending(false);
@@ -946,6 +1011,7 @@ export default function NexoApp({
     setMessages([]);
     setMembers([]);
     lastIdRef.current = 0;
+    serverTimeRef.current = null;
     setTab("boards");
     setMobilePane("chat");
     void joinBoard(id);
@@ -978,9 +1044,16 @@ export default function NexoApp({
     setDmId(id);
     setDmMessages([]);
     dmLastIdRef.current = 0;
-    const unlocked = getStorage()?.getItem(dmUnlockKey(id)) === "1";
-    setDmUnlocked(unlocked);
-    if (!unlocked) setDmPin("");
+    const st = getStorage();
+    const unlocked = st?.getItem(dmUnlockKey(id)) === "1";
+    const token = st?.getItem(dmUnlockTokenKey(id)) || "";
+    setDmUnlocked(unlocked && Boolean(token || dmPin));
+    setDmUnlockToken(token);
+    // sin token guardado hay que re-ingresar PIN (tokens viejos de solo "1")
+    if (!token) {
+      setDmUnlocked(false);
+      setDmPin("");
+    }
     setTab("dm");
     setMobilePane("chat");
   }
@@ -1086,7 +1159,7 @@ export default function NexoApp({
           body: JSON.stringify({
             action: "delete",
             message_id: m.id,
-            pin: dmPin,
+            ...dmAuthBody(),
           }),
         });
         const d = await res.json();
@@ -1140,7 +1213,7 @@ export default function NexoApp({
             action: "edit",
             message_id: m.id,
             body: text,
-            pin: dmPin,
+            ...dmAuthBody(),
           }),
         });
         const d = await res.json();
@@ -1166,7 +1239,7 @@ export default function NexoApp({
   }
 
   async function setEphemeral(minutes: number) {
-    if (!dmId || !dmPin) return;
+    if (!dmId || (!dmPin && !dmUnlockToken)) return;
     try {
       const res = await apiFetch("/api/nexo/dm", {
         method: "POST",
@@ -1174,8 +1247,8 @@ export default function NexoApp({
         body: JSON.stringify({
           action: "ephemeral",
           thread_id: dmId,
-          pin: dmPin,
           minutes,
+          ...dmAuthBody(),
         }),
       });
       const d = await res.json();

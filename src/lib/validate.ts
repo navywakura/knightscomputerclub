@@ -136,6 +136,8 @@ export const nexoDmPostSchema = z
       .optional(),
     username: z.string().max(40).optional(),
     pin: z.string().max(8).optional(),
+    /** JWT de unlock tras PIN correcto — evita bcrypt por mensaje */
+    unlock_token: z.string().max(2048).optional(),
     thread_id: z.coerce.number().int().positive().optional(),
     body: z.string().max(4000).optional(),
     message_id: z.coerce.number().int().positive().optional(),

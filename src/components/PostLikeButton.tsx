@@ -7,7 +7,11 @@ type Props = {
   initialCount?: number;
   initialLiked?: boolean;
   disabled?: boolean;
-  /** poll opcional para “tiempo real” sin websocket */
+  /**
+   * poll opcional para “tiempo real” sin websocket.
+   * Default 0: sin poll (los likes optimistas + recarga de hilo bastan).
+   * Activar p.ej. pollMs={30000} si se quiere sync pasivo.
+   */
   pollMs?: number;
 };
 
@@ -16,7 +20,7 @@ export default function PostLikeButton({
   initialCount = 0,
   initialLiked = false,
   disabled = false,
-  pollMs = 8000,
+  pollMs = 0,
 }: Props) {
   const [count, setCount] = useState(initialCount);
   const [liked, setLiked] = useState(initialLiked);
@@ -45,8 +49,12 @@ export default function PostLikeButton({
   }, [postId]);
 
   useEffect(() => {
-    if (!pollMs || pollMs < 2000) return;
-    const iv = window.setInterval(() => void refresh(), pollMs);
+    if (!pollMs || pollMs < 5000) return;
+    const tick = () => {
+      if (document.visibilityState !== "visible") return;
+      void refresh();
+    };
+    const iv = window.setInterval(tick, pollMs);
     return () => window.clearInterval(iv);
   }, [pollMs, refresh]);
 

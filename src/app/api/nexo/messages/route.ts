@@ -221,33 +221,39 @@ export async function POST(req: Request) {
       DO UPDATE SET last_seen = NOW()
     `;
 
+    // menciones en background — no bloquear el send
     const names = extractMentions(text);
     if (names.length) {
-      const targets = await resolveMentionUserIds(db, names, me.id);
-      if (targets.length) {
-        const boardMeta = await db`
-          SELECT slug, name FROM nexo_boards WHERE id = ${boardId} LIMIT 1
-        `;
-        const bname = boardMeta[0]
-          ? String(boardMeta[0].name)
-          : `board #${boardId}`;
-        await safeNotifyMany(
-          targets.map((t) => t.id),
-          {
-            type: "nexo.mention",
-            title: `@${me.username} te mencionó en ${bname}`,
-            body: messageExcerpt(text),
-            href: `/nexo?board=${boardId}`,
-            actorId: me.id,
-            actorLabel: me.username,
-            payload: {
-              boardId,
-              messageId: Number(rows[0].id),
-              kind: "mention",
-            },
-          }
-        );
-      }
+      void (async () => {
+        try {
+          const targets = await resolveMentionUserIds(db, names, me.id);
+          if (!targets.length) return;
+          const boardMeta = await db`
+            SELECT slug, name FROM nexo_boards WHERE id = ${boardId} LIMIT 1
+          `;
+          const bname = boardMeta[0]
+            ? String(boardMeta[0].name)
+            : `board #${boardId}`;
+          await safeNotifyMany(
+            targets.map((t) => t.id),
+            {
+              type: "nexo.mention",
+              title: `@${me.username} te mencionó en ${bname}`,
+              body: messageExcerpt(text),
+              href: `/nexo?board=${boardId}`,
+              actorId: me.id,
+              actorLabel: me.username,
+              payload: {
+                boardId,
+                messageId: Number(rows[0].id),
+                kind: "mention",
+              },
+            }
+          );
+        } catch (e) {
+          console.error("[nexo messages mention]", e);
+        }
+      })();
     }
 
     return NextResponse.json(

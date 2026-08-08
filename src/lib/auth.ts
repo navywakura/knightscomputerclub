@@ -13,6 +13,18 @@ export const COOKIE_NAME = "kc_session";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 14; // dos semanas, como el alquiler del depa
 const MAX_AGE = SESSION_MAX_AGE;
 
+/** Cache en proceso de getSessionUser — evita SELECT en cada poll de nexo */
+const SESSION_CACHE_TTL_MS = 15_000;
+const sessionUserCache = new Map<
+  number,
+  { user: PublicUser; exp: number }
+>();
+
+export function invalidateSessionUserCache(userId?: number) {
+  if (userId != null) sessionUserCache.delete(userId);
+  else sessionUserCache.clear();
+}
+
 function getSecret() {
   const secret = process.env.JWT_SECRET;
   if (!secret || secret.length < 16) {
@@ -78,6 +90,11 @@ export async function getSessionUser(): Promise<PublicUser | null> {
     const id = Number(payload.sub);
     if (!id) return null;
 
+    const hit = sessionUserCache.get(id);
+    if (hit && hit.exp > Date.now()) {
+      return hit.user;
+    }
+
     const db = getDb();
     const rows = await db`
       SELECT
@@ -106,6 +123,7 @@ export async function getSessionUser(): Promise<PublicUser | null> {
     };
     // ban → sesión inválida
     if (u.banned) {
+      sessionUserCache.delete(id);
       await clearSessionCookie().catch(() => {});
       return null;
     }
@@ -113,11 +131,12 @@ export async function getSessionUser(): Promise<PublicUser | null> {
     if (u.deleted_at) {
       const deadline = new Date(u.deleted_at).getTime() + 7 * 86400_000;
       if (Date.now() > deadline) {
+        sessionUserCache.delete(id);
         await clearSessionCookie().catch(() => {});
         return null;
       }
     }
-    return toPublicUser({
+    const publicUser = toPublicUser({
       id: u.id,
       username: u.username,
       email: String(u.email || ""),
@@ -139,6 +158,11 @@ export async function getSessionUser(): Promise<PublicUser | null> {
       deleted_at: u.deleted_at,
       connections: u.connections as UserConnections | null,
     });
+    sessionUserCache.set(id, {
+      user: publicUser,
+      exp: Date.now() + SESSION_CACHE_TTL_MS,
+    });
+    return publicUser;
   } catch {
     return null;
   }

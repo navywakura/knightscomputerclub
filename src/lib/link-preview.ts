@@ -229,32 +229,53 @@ async function readCache(urls: string[]): Promise<Map<string, LinkPreview>> {
   try {
     await ensureSchema();
     const db = getDb();
-    // neon no soporta ANY bien con arrays dinámicos siempre — query por url
-    for (const url of urls) {
-      const rows = await db`
-        SELECT url, final_url, title, description, image, site_name, ok, fetched_at
-        FROM link_previews
-        WHERE url = ${url}
-        LIMIT 1
-      `;
-      if (!rows[0]) continue;
-      const age =
-        Date.now() - new Date(String(rows[0].fetched_at)).getTime();
-      if (age > CACHE_DAYS * 86400_000) continue;
-      map.set(url, {
-        url: String(rows[0].url),
-        final_url: String(rows[0].final_url || rows[0].url),
-        title: rows[0].title ? String(rows[0].title) : null,
-        description: rows[0].description
-          ? String(rows[0].description)
-          : null,
-        image: rows[0].image ? String(rows[0].image) : null,
-        site_name: rows[0].site_name ? String(rows[0].site_name) : null,
-        ok: Boolean(rows[0].ok),
+    const rows = await db`
+      SELECT url, final_url, title, description, image, site_name, ok, fetched_at
+      FROM link_previews
+      WHERE url = ANY(${urls})
+        AND fetched_at > NOW() - (${CACHE_DAYS} * INTERVAL '1 day')
+    `;
+    for (const row of rows as Record<string, unknown>[]) {
+      map.set(String(row.url), {
+        url: String(row.url),
+        final_url: String(row.final_url || row.url),
+        title: row.title ? String(row.title) : null,
+        description: row.description ? String(row.description) : null,
+        image: row.image ? String(row.image) : null,
+        site_name: row.site_name ? String(row.site_name) : null,
+        ok: Boolean(row.ok),
       });
     }
   } catch {
-    /* ignore cache miss */
+    /* ignore cache miss — fallback por-url */
+    try {
+      const db = getDb();
+      for (const url of urls.slice(0, 24)) {
+        const rows = await db`
+          SELECT url, final_url, title, description, image, site_name, ok, fetched_at
+          FROM link_previews
+          WHERE url = ${url}
+          LIMIT 1
+        `;
+        if (!rows[0]) continue;
+        const age =
+          Date.now() - new Date(String(rows[0].fetched_at)).getTime();
+        if (age > CACHE_DAYS * 86400_000) continue;
+        map.set(url, {
+          url: String(rows[0].url),
+          final_url: String(rows[0].final_url || rows[0].url),
+          title: rows[0].title ? String(rows[0].title) : null,
+          description: rows[0].description
+            ? String(rows[0].description)
+            : null,
+          image: rows[0].image ? String(rows[0].image) : null,
+          site_name: rows[0].site_name ? String(rows[0].site_name) : null,
+          ok: Boolean(rows[0].ok),
+        });
+      }
+    } catch {
+      /* */
+    }
   }
   return map;
 }
@@ -289,9 +310,15 @@ async function writeCache(preview: LinkPreview) {
   }
 }
 
+export type ResolvePreviewOpts = {
+  /** Solo leer cache DB — no fetch HTTP (carga de hilo más rápida) */
+  cacheOnly?: boolean;
+};
+
 /** Carga previews (cache + fetch) para una lista de URLs */
 export async function resolveLinkPreviews(
-  urls: string[]
+  urls: string[],
+  opts: ResolvePreviewOpts = {}
 ): Promise<LinkPreview[]> {
   const unique = [...new Set(urls.map(normalizeUrl))].filter(isSafeExternalUrl);
   if (!unique.length) return [];
@@ -305,6 +332,8 @@ export async function resolveLinkPreviews(
     if (c) out.push(c);
     else missing.push(u);
   }
+
+  if (opts.cacheOnly) return out;
 
   // fetch en paralelo limitado
   const batch = missing.slice(0, MAX_URLS_PER_BODY);
@@ -324,12 +353,16 @@ export async function resolveLinkPreviews(
   return out;
 }
 
-export async function previewsForBody(body: string): Promise<LinkPreview[]> {
-  return resolveLinkPreviews(extractExternalUrls(body));
+export async function previewsForBody(
+  body: string,
+  opts: ResolvePreviewOpts = {}
+): Promise<LinkPreview[]> {
+  return resolveLinkPreviews(extractExternalUrls(body), opts);
 }
 
 export async function previewsForPosts(
-  posts: Array<{ id: number; body: string }>
+  posts: Array<{ id: number; body: string }>,
+  opts: ResolvePreviewOpts = {}
 ): Promise<Map<number, LinkPreview[]>> {
   const all = new Set<string>();
   const urlsByPost = new Map<number, string[]>();
@@ -338,7 +371,7 @@ export async function previewsForPosts(
     urlsByPost.set(p.id, urls);
     urls.forEach((u) => all.add(u));
   }
-  const allPreviews = await resolveLinkPreviews([...all]);
+  const allPreviews = await resolveLinkPreviews([...all], opts);
   const byUrl = new Map(allPreviews.map((p) => [p.url, p]));
 
   const result = new Map<number, LinkPreview[]>();

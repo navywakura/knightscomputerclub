@@ -3,6 +3,7 @@ import { getSessionUser, requireVerified } from "@/lib/auth";
 import { verifyCaptcha } from "@/lib/captcha";
 import { ensureSchema, getDb } from "@/lib/db";
 import { previewsForPosts, type LinkPreview } from "@/lib/link-preview";
+import { firstMediaId } from "@/lib/markdown";
 import { safeNotifyMany } from "@/lib/notify";
 import { isOwnerUser } from "@/lib/ranks";
 import { logServerError, publicError } from "@/lib/safe-error";
@@ -58,9 +59,14 @@ export async function GET(req: Request) {
         u.role AS author_role,
         u.is_vip AS author_is_vip,
         u.avatar_media_id AS author_avatar_media_id,
-        (SELECT COUNT(*)::int FROM post_likes pl WHERE pl.post_id = p.id) AS like_count
+        COALESCE(lc.cnt, 0)::int AS like_count
       FROM posts p
       JOIN users u ON u.id = p.author_id
+      LEFT JOIN (
+        SELECT post_id, COUNT(*)::int AS cnt
+        FROM post_likes
+        GROUP BY post_id
+      ) lc ON lc.post_id = p.id
       WHERE p.thread_id = ${threadId}
       ORDER BY p.created_at ASC
     `;
@@ -81,14 +87,18 @@ export async function GET(req: Request) {
       }
     }
 
-    // Open Graph embeds por post (cache + fetch)
+    // Open Graph: solo cache en carga de hilo (fetch live en background opcional)
+    const wantLive =
+      searchParams.get("previews") === "live" ||
+      searchParams.get("previews") === "1";
     let previews: Record<string, LinkPreview[]> = {};
     try {
       const map = await previewsForPosts(
         posts.map((p) => ({
           id: Number(p.id),
           body: String(p.body || ""),
-        }))
+        })),
+        { cacheOnly: !wantLive }
       );
       previews = Object.fromEntries(
         [...map.entries()].map(([id, list]) => [String(id), list])
@@ -212,43 +222,58 @@ export async function POST(req: Request) {
         pgp_fingerprint, pgp_signature
     `;
 
+    const mediaId = firstMediaId(content);
     await db`
-      UPDATE threads SET updated_at = NOW() WHERE id = ${threadId}
+      UPDATE threads
+      SET
+        updated_at = NOW(),
+        post_count = COALESCE(post_count, 0) + 1,
+        thumb_media_id = COALESCE(thumb_media_id, ${mediaId})
+      WHERE id = ${threadId}
     `;
-
-    // Notificar autor del hilo + participantes (excepto quien escribió)
-    const participants = await db`
-      SELECT DISTINCT author_id FROM posts WHERE thread_id = ${threadId}
-    `;
-    const recipientIds = new Set<number>();
-    recipientIds.add(Number(threads[0].author_id));
-    for (const row of participants) {
-      recipientIds.add(Number(row.author_id));
-    }
-    recipientIds.delete(me.id);
 
     const postId = Number(posts[0].id);
     const title = String(threads[0].title || `thread #${threadId}`);
     const excerpt =
       content.length > 120 ? content.slice(0, 119).trimEnd() + "…" : content;
 
-    await safeNotifyMany([...recipientIds], {
-      type: "forum.reply",
-      title: `respuesta en: ${title.slice(0, 80)}`,
-      body: `@${me.username}: ${excerpt}`,
-      href: `/forum/post/${postId}`,
-      actorId: me.id,
-      actorLabel: me.username,
-      payload: { threadId, postId },
-    });
+    // notificaciones en background para no retrasar el reply
+    void (async () => {
+      try {
+        const participants = await db`
+          SELECT DISTINCT author_id FROM posts WHERE thread_id = ${threadId}
+        `;
+        const recipientIds = new Set<number>();
+        recipientIds.add(Number(threads[0].author_id));
+        for (const row of participants) {
+          recipientIds.add(Number(row.author_id));
+        }
+        recipientIds.delete(me.id);
+        await safeNotifyMany([...recipientIds], {
+          type: "forum.reply",
+          title: `respuesta en: ${title.slice(0, 80)}`,
+          body: `@${me.username}: ${excerpt}`,
+          href: `/forum/post/${postId}`,
+          actorId: me.id,
+          actorLabel: me.username,
+          payload: { threadId, postId },
+        });
+      } catch (e) {
+        console.error("[posts POST notify]", e);
+      }
+    })();
 
     return NextResponse.json(
       {
         post: {
           ...posts[0],
           author_name: me.username,
+          author_display_name: me.display_name,
           author_role: me.role,
           author_is_vip: me.is_vip,
+          author_avatar_url: me.avatar_url,
+          like_count: 0,
+          liked_by_me: false,
         },
       },
       { status: 201 }
@@ -314,8 +339,11 @@ export async function DELETE(req: Request) {
       await db`DELETE FROM threads WHERE id = ${post.thread_id}`;
       threadDeleted = true;
     } else {
+      const n = Number(left[0]?.n || 0);
       await db`
-        UPDATE threads SET updated_at = NOW() WHERE id = ${post.thread_id}
+        UPDATE threads
+        SET updated_at = NOW(), post_count = ${n}
+        WHERE id = ${post.thread_id}
       `;
     }
 
