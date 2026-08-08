@@ -10,6 +10,7 @@ import {
   playNotifySound,
   unlockNotifyAudio,
 } from "@/lib/notify-sound";
+import { isNotifyMuted, pushNotifyToast } from "@/lib/notify-prefs";
 import { getRank, isOwnerUser, rankNameClass } from "@/lib/ranks";
 import { useIsPhone } from "@/lib/use-phone";
 
@@ -166,10 +167,20 @@ export default function Header() {
                 pollMs={6000}
                 desktopNotify
                 onNewUnread={({ latest }) => {
+                  if (isNotifyMuted()) return;
                   const kind = notifySoundKindFromType(
                     latest?.type || "system"
                   );
                   playNotifySound(kind);
+                  if (latest) {
+                    pushNotifyToast({
+                      id: latest.id,
+                      type: latest.type,
+                      title: latest.title || "nueva notificación",
+                      body: latest.body || "",
+                      href: latest.href,
+                    });
+                  }
                 }}
                 onNavigate={(href) => {
                   setMenuOpen(false);

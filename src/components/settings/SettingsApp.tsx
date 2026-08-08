@@ -9,6 +9,10 @@ import {
   ensureNotifyPermission,
   canUseDesktopNotify,
 } from "@/lib/browser-notify";
+import {
+  isNotifyMuted,
+  setNotifyMuted,
+} from "@/lib/notify-prefs";
 import { isUiSfxEnabled, setUiSfxEnabled, playUiSfx } from "@/lib/ui-sfx";
 import {
   DEFAULT_PROFILE_THEME,
@@ -123,6 +127,7 @@ export default function SettingsApp({
   const [outgoing, setOutgoing] = useState<FriendUser[]>([]);
   const [friendUser, setFriendUser] = useState("");
   const [notifyPerm, setNotifyPerm] = useState<string>("");
+  const [notifyMuted, setNotifyMutedState] = useState(false);
   const [uiSfx, setUiSfx] = useState(true);
 
   // email change / OTP
@@ -211,6 +216,7 @@ export default function SettingsApp({
       setNotifyPerm("unsupported");
     }
     setUiSfx(isUiSfxEnabled());
+    setNotifyMutedState(isNotifyMuted());
   }, []);
 
   async function uploadMedia(
@@ -1391,7 +1397,8 @@ export default function SettingsApp({
           <h3 className="settings-sub">notificaciones del sistema</h3>
           <p className="muted" style={{ fontSize: "0.9rem" }}>
             Navegador y app Electron: avisos aunque la pestaña esté en
-            segundo plano. In-app siempre activa (campana).
+            segundo plano. In-app: campana + popup flotante (DM, replies,
+            menciones).
           </p>
           <p>
             permiso: <code>{notifyPerm || "…"}</code>
@@ -1413,6 +1420,50 @@ export default function SettingsApp({
           >
             [ activar notificaciones desktop ]
           </button>
+          <label className="settings-radio" style={{ marginTop: 12 }}>
+            <input
+              type="checkbox"
+              checked={notifyMuted}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setNotifyMutedState(on);
+                setNotifyMuted(on);
+                setOk(
+                  on
+                    ? "notificaciones silenciadas (popup + sonido)"
+                    : "notificaciones reactivadas"
+                );
+              }}
+            />
+            silenciar notificaciones (popup y sonido in-app)
+          </label>
+          <p className="muted" style={{ fontSize: "0.8rem", marginTop: 4 }}>
+            La campana del header sigue recibiendo avisos; solo se callan el
+            popup y el beep. Las desktop del SO no se ven afectadas.
+          </p>
+          {!notifyMuted ? (
+            <button
+              type="button"
+              className="btn secondary"
+              style={{ marginTop: 8 }}
+              onClick={() => {
+                // preview del toast global
+                window.dispatchEvent(
+                  new CustomEvent("kcc:notify-toast", {
+                    detail: {
+                      id: `preview-${Date.now()}`,
+                      type: "nexo.dm",
+                      title: "preview · notificación",
+                      body: "así se ve el popup (3s · X para cerrar)",
+                      href: "/settings",
+                    },
+                  })
+                );
+              }}
+            >
+              [ probar popup ]
+            </button>
+          ) : null}
 
           <h3 className="settings-sub">SFX de interfaz</h3>
           <p className="muted" style={{ fontSize: "0.9rem" }}>

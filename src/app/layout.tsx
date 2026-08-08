@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import AmbientMusicPlayer from "@/components/AmbientMusicPlayer";
+import GlobalNotifyToast from "@/components/GlobalNotifyToast";
 import JsonLd, { siteJsonLd } from "@/components/JsonLd";
 import { getSiteUrl } from "@/lib/site";
 import "./globals.css";
@@ -121,6 +122,7 @@ export default function RootLayout({
           <main>{children}</main>
           <Footer />
         </div>
+        <GlobalNotifyToast />
         <AmbientMusicPlayer />
       </body>
     </html>
